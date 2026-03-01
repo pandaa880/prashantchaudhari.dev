@@ -6,26 +6,6 @@ This is the source code for my personal website, built with [Astro](https://astr
 
 I'm Prashant Chaudhari. This website hosts my personal blog and information about my work.
 
-## Project Structure
-
-```text
-├── public/               # Static assets (images, fonts, favicon)
-│   └── pagefind/         # Auto-generated search index (when built)
-├── src/
-│   ├── assets/           # Icons and images used in components
-│   ├── components/       # Reusable UI components
-│   ├── data/
-│   │   └── blog/         # Blog posts in Markdown format
-│   ├── layouts/          # Page layouts and templates
-│   ├── pages/            # Routes and pages
-│   ├── scripts/          # Client-side scripts
-│   ├── styles/           # Global styles and CSS
-│   └── utils/            # Utility functions
-├── astro.config.ts       # Astro configuration
-├── package.json          # Project dependencies and scripts
-└── LICENSE.md            # Dual license (CC BY 4.0 + MIT)
-```
-
 ## Commands
 
 | Command                | Action                                      |
@@ -37,7 +17,7 @@ I'm Prashant Chaudhari. This website hosts my personal blog and information abou
 
 ## Deployment
 
-This site is set up for easy deployment on Vercel. Just connect your GitHub repository to Vercel, and it will automatically build and deploy the site when changes are pushed.
+This site is set up for easy deployment on Netlify. Just connect your GitHub repository to Netlify, and it will automatically build and deploy the site when changes are pushed.
 
 ## License
 
