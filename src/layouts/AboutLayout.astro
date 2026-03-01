@@ -19,6 +19,27 @@ const { frontmatter } = Astro.props;
       <h1 class="text-2xl tracking-wider sm:text-3xl">{frontmatter.title}</h1>
       <slot />
     </section>
+    <section id="github-activity" class="app-prose mb-28 max-w-app prose-img:border-0">
+      <h2 class="text-xl tracking-wider sm:text-2xl">GitHub Activity</h2>
+      <p class="mb-4">
+        <a
+          href={`https://github.com/${SITE.githubUsername}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="underline hover:no-underline"
+        >
+          Follow me on GitHub
+        </a>
+      </p>
+      <img
+        src={`https://ghchart.rshah.org/${SITE.githubUsername}`}
+        alt={`${SITE.githubUsername}'s GitHub contribution chart`}
+        class="max-w-full h-auto"
+        width="800"
+        height="200"
+        loading="lazy"
+      />
+    </section>
   </main>
   <Footer />
 </Layout>
