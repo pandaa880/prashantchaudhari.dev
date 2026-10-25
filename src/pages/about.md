@@ -6,7 +6,7 @@ description: "Senior frontend engineer with seven years of experience, four on c
 
 I'm Prashant, a senior frontend engineer with seven years of experience, the last four building consumer credit products.
 
-I spent three years at Deserve, a credit-as-a-service company, shipping core features end to end. Intuit acquired Deserve in 2025, and I then worked on frontend for Intuit's credit products.
+I worked on credit products at Deserve, then at Intuit.
 
 Since then I've been building on Solana. My latest project, [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle), turns a bank statement into a per-loan receipt a lender can verify without seeing the statement.
 
