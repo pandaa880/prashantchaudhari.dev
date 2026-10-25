@@ -3,6 +3,8 @@ import { Font } from "astro:assets";
 import { ClientRouter } from "astro:transitions";
 import { PUBLIC_GOOGLE_SITE_VERIFICATION } from "astro:env/client";
 import { SITE } from "@/config";
+import { SOCIALS } from "@/constants";
+import { getPersonSchema } from "@/utils/structuredData";
 import "@/styles/global.css";
 
 type Props = {
@@ -15,6 +17,12 @@ type Props = {
   pubDatetime?: Date;
   modDatetime?: Date | null;
   scrollSmooth?: boolean;
+  /** Post title without the site suffix, for BlogPosting. */
+  headline?: string;
+  /** Keep the page out of search results (404, search). */
+  noindex?: boolean;
+  /** JSON-LD for non-post pages. Posts get a BlogPosting automatically. */
+  structuredData?: Record<string, unknown>;
 };
 
 const {
@@ -27,25 +35,43 @@ const {
   pubDatetime,
   modDatetime,
   scrollSmooth = false,
+  headline = title,
+  noindex = false,
+  structuredData: pageStructuredData,
 } = Astro.props;
 
 const socialImageURL = new URL(ogImage, Astro.url);
 
-const structuredData = {
-  "@context": "https://schema.org",
-  "@type": "BlogPosting",
-  headline: `${title}`,
-  image: `${socialImageURL}`,
-  datePublished: `${pubDatetime?.toISOString()}`,
-  ...(modDatetime && { dateModified: modDatetime.toISOString() }),
-  author: [
-    {
-      "@type": "Person",
-      name: `${author}`,
-      ...(profile && { url: profile }),
-    },
-  ],
-};
+const isPost = pubDatetime !== undefined;
+
+const structuredData = isPost
+  ? {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      headline,
+      description,
+      url: `${canonicalURL}`,
+      mainEntityOfPage: `${canonicalURL}`,
+      image: `${socialImageURL}`,
+      datePublished: pubDatetime.toISOString(),
+      ...(modDatetime && { dateModified: modDatetime.toISOString() }),
+      author:
+        author === SITE.author
+          ? getPersonSchema()
+          : {
+              "@type": "Person",
+              name: author,
+              ...(profile && { url: profile }),
+            },
+    }
+  : pageStructuredData;
+
+// og.png shows the site name; a post's generated image shows its title.
+const socialImageAlt = isPost ? headline : SITE.title;
+
+const xHandle = SOCIALS.find(({ name }) => name === "X")
+  ?.href.split("/")
+  .pop();
 ---
 
 <!doctype html>
@@ -58,7 +84,13 @@ const structuredData = {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="canonical" href={canonicalURL} />
+    {
+      noindex ? (
+        <meta name="robots" content="noindex" />
+      ) : (
+        <link rel="canonical" href={canonicalURL} />
+      )
+    }
     <meta name="generator" content={Astro.generator} />
 
     <!-- Load Font -->
@@ -75,10 +107,13 @@ const structuredData = {
     <link rel="sitemap" href="/sitemap-index.xml" />
 
     <!-- Open Graph / Facebook -->
+    <meta property="og:type" content={isPost ? "article" : "website"} />
+    <meta property="og:site_name" content={SITE.title} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalURL} />
     <meta property="og:image" content={socialImageURL} />
+    <meta property="og:image:alt" content={socialImageAlt} />
 
     <!-- Article Published/Modified time -->
     {
@@ -99,18 +134,24 @@ const structuredData = {
     }
 
     <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content={canonicalURL} />
-    <meta property="twitter:title" content={title} />
-    <meta property="twitter:description" content={description} />
-    <meta property="twitter:image" content={socialImageURL} />
+    <meta name="twitter:card" content="summary_large_image" />
+    {xHandle && <meta name="twitter:site" content={`@${xHandle}`} />}
+    {xHandle && <meta name="twitter:creator" content={`@${xHandle}`} />}
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={socialImageURL} />
+    <meta name="twitter:image:alt" content={socialImageAlt} />
 
     <!-- Google JSON-LD Structured data -->
-    <script
-      type="application/ld+json"
-      is:inline
-      set:html={JSON.stringify(structuredData)}
-    />
+    {
+      structuredData && (
+        <script
+          type="application/ld+json"
+          is:inline
+          set:html={JSON.stringify(structuredData).replace(/</g, "\\u003c")}
+        />
+      )
+    }
 
     <!-- Enable RSS feed auto-discovery  -->
     <!-- https://docs.astro.build/en/recipes/rss/#enabling-rss-feed-auto-discovery -->
