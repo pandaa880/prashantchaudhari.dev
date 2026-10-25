@@ -49,15 +49,13 @@ const total = emisPaise[0] + emisPaise[1] + emisPaise[2]; // 2000500n
 
 ## Why floats can't hold most rupee amounts
 
-A float stores a number as a binary fraction. A paisa is a decimal fraction: 1/100 of a rupee.
-
-Decimal has the same problem with other numbers. You can't write 1/3 in decimal; it's `0.3333…` forever, because 3 doesn't divide any power of 10. A fraction ends in decimal only if its denominator, in lowest terms, is made of 2s and 5s. Binary is stricter: the denominator has to be a power of 2. ½ and ¼ are fine. 1/20 has a 5 in it, so 0.05 repeats forever in binary:
+A float stores numbers in binary, and binary can only write some fractions exactly. Decimal has the same problem with 1/3: you can't write it, only `0.3333…` forever. Binary can write halves, quarters and eighths, but not tenths or hundredths. So 0.05 gets stored as the nearest value binary can hold:
 
 ```js
 (0.05).toFixed(30); // "0.050000000000000002775557561563"
 ```
 
-A paise ending is k/100, and it reduces to a power-of-two denominator only when k is a multiple of 25. I checked all 100 endings with a script: **96 of the 100 possible paise endings repeat in binary.** Only `.00`, `.25`, `.50` and `.75` can be stored exactly, and only if the whole amount fits the format's precision.
+I checked all 100 possible paise endings with a script: **96 of them can't be stored exactly.** Only `.00`, `.25`, `.50` and `.75` can, and only if the whole amount fits the format's precision.
 
 That's a statement about endings, not about real transactions, which don't spread evenly across them. For amounts with any of those 96 endings, a binary float holds an approximation. Each error is tiny. Across hundreds of transactions, rounding errors can accumulate, and as the example above shows, a tiny error is enough when it lands on a boundary.
 
@@ -90,42 +88,22 @@ The amount has to become an integer without ever becoming a float. If a JSON lib
 
 The rule: **within the supported grammar and range, accept any spelling that is exactly a whole number of paise, and reject everything else. Never round.** Rounding would hide bad bank data inside a signed result.
 
-The parser splits the text into a sign, integer digits, fractional digits and an exponent. Then it writes the amount as a whole number times a power of ten, and works out that power.
+The idea is simple: read the amount as text, move the decimal point two places to the right, and insist that what's left is a whole number.
 
-Take `1234.050`. Joining the integer and fractional digits gives `1234050`, which is the amount with its decimal point moved three places right. So the power starts at `0 + 2 − 3 = −1`: the exponent (none here), plus 2 to turn rupees into paise, minus one for each fractional digit. Removing the trailing zero leaves `123405` and adds one power of ten back, so the final power is `0 + 2 − 3 + 1 = 0`. The result is `123405 × 10⁰`, or 1,23,405 paise. If the power is still below zero at this point, the amount has a fraction of a paisa, and the parser rejects it.
+| Input      | Result                                                  |
+| :--------- | :------------------------------------------------------ |
+| `1234.05`  | 1,23,405 paise                                          |
+| `1234.050` | 1,23,405 paise: a trailing zero changes nothing         |
+| `1.2E7`    | 1,20,00,00,000 paise (₹1.2 crore)                       |
+| `1234.567` | rejected: the last digit would be a fraction of a paisa |
 
-The same calculation in the parser, where `digits` is the joined digits without leading zeros and `significant` is `digits` without trailing zeros:
-
-```rust
-let trailing_zeros = to_i64(digits.len() - significant.len())?;
-let power = decimal.exponent + 2 - to_i64(decimal.frac.len())? + trailing_zeros;
-if power < 0 {
-    return Err(MoneyError::NotWholePaise);
-}
-```
-
-Because trailing zeros fold into the power, `1234.050` and `1234.05` come out the same. A few more inputs:
-
-| Input      | Significant digits | Power | Result                         |
-| :--------- | :----------------- | :---- | :----------------------------- |
-| `1234.05`  | `123405`           | 0     | 1,23,405 paise                 |
-| `1234.050` | `123405`           | 0     | 1,23,405 paise                 |
-| `1.2E7`    | `12`               | 8     | 1,20,00,00,000 paise (₹1.2 cr) |
-| `1234.567` | `1234567`          | −1    | rejected: not whole paise      |
-
-The supported range has two deliberate limits. Exponents are capped at ±30, and the grammar is checked before any range check, so a hostile `1e999999999` is rejected cheaply. And `i64::MIN` is rejected, so every value the parser returns can be negated safely. The full parser is about 220 lines with comments: [`tio-core/src/money.rs`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/tio-core/src/money.rs).
+The code works with digit counts rather than moving a character around, so scientific notation goes through the same path as a plain decimal. It also turns away anything too big to be a real amount, such as a hostile `1e999999999`, before doing any arithmetic. The full parser is about 220 lines with comments: [`tio-core/src/money.rs`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/tio-core/src/money.rs).
 
 ## Rounding that both scorers agree on
 
-Integers remove accidental rounding, not all rounding. A scorer still divides: FOIR is a ratio, a median of an even number of months falls between two values, and income volatility needs a square root. So every rounding step is written into the spec, and both scorers implement it the same way:
+Integers remove accidental rounding, not all rounding. A scorer still divides: FOIR is a ratio, and two other features need a median and a square root. So each of those steps rounds down, the spec says so, and both scorers do exactly that. Every amount involved is zero or positive, so "round down" means the same thing in Rust and in JavaScript's `bigint`.
 
-- FOIR is `floor(obligations × 10000 / income)` in basis points.
-- An even-length median is the floor of the two middle values' mean.
-- The coefficient of variation uses an integer square root, rounded down.
-
-All three work on non-negative paise. The parser rejects a negative transaction amount, so monthly incomes and EMIs can't drop below zero, and a statement with no income is rejected before FOIR is used. That matters if you port these formulas. Integer division in Rust and with JavaScript's `bigint` truncates toward zero, which equals floor only when the result is non-negative: `-3n / 2n` is `-1n`, but the floor of −1.5 is −2. If your inputs can be negative, write the floor explicitly. In Rust, `div_euclid` does it for a positive divisor.
-
-The FOIR floor is a policy choice, and it's worth saying plainly what it means: ₹20,000.01 against ₹50,000 is 40.00002%, which floors to 4,000 basis points and still counts as tier A. I'm fine with that band in an eligibility rule, because it's written down and both scorers apply it. If you need "at most 40%" exactly, skip the division and compare products: `obligations × 5 ≤ income × 2`.
+Rounding down is a policy choice, and it has a visible effect: ₹20,000.01 against ₹50,000 is 40.00002%, which rounds down to 4,000 basis points and still counts as tier A. I'm fine with that band in an eligibility rule, because it's written down and both scorers apply it. If you need "at most 40%" exactly, skip the division and compare products: `obligations × 5 ≤ income × 2`.
 
 ## Other ways to do it
 
