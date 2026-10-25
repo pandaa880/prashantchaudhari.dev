@@ -116,13 +116,13 @@ None of this makes the page trustless:
 - **"Confirmed" also comes from that node.** The signature check proves the id belongs to the bytes the page built; the node still reports whether they landed.
 - **I serve the page.** A different build could skip every check. That's why the source is public at release tags, and why the receipt checks also run from a command line.
 
-What the checks do buy: my gateway can't make the page show a tier, a loan or a registration that isn't on chain. A bug in the gateway shows up as an error on screen, not as a wrong number a lender acts on.
+What the checks do buy: my gateway is no longer the only authority for a tier, a loan or a registration. The page checks each of those claims against what an RPC node returns, and most gateway bugs now show up as an error on screen instead of a wrong number. The limits above still apply: a stale read, or a reused identical transaction, can get past these checks.
 
 ## A checklist for your own frontend
 
 - **Rebuild anything the user signs** from data you already hold, and sign your copy.
 - **Treat a signature from an API as a claim.** If you built the transaction, verify the signature over its bytes. It ties the id to those bytes; it doesn't stop an identical transaction being reused.
-- **Show values from a chain read**, not from the API that triggered the write. Compare every field the API reported, display the chain's values, and fail closed when they differ.
+- **Show values from a chain read**, not from the API that triggered the write. Compare every field of the reported payload, display the chain's values, and fail closed when the payloads differ. Read anything outside the payload, such as expiry, straight from the chain.
 - **Make a status badge mirror the program's checks**, in the program's order, and say what it doesn't cover.
 - **After a write, keep the read that proved it.** For later reads, carry the highest slot you've accepted forward as `minContextSlot`.
 - **Check reply lengths** whenever you match results to requests by position.
