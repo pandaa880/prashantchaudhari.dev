@@ -1,6 +1,6 @@
 ---
-title: "Money without floats: why 96% of rupee amounts can't be stored exactly"
-description: "India's bank-data schema types amounts as xs:float. Why 96 of 100 paise endings can't be stored exactly, and how I parse money as integer paise."
+title: "Money without floats: parsing rupees as integer paise"
+description: "Why 96 of 100 paise endings repeat in binary, how that can flip a signed credit tier, and how I parse bank amounts from text into integer paise."
 pubDatetime: 2026-10-27T10:00:00+05:30 # placeholder: set the real time when publishing
 tags:
   - fintech
@@ -9,101 +9,72 @@ tags:
 draft: true
 ---
 
-I'm building [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle), a service that reads a borrower's bank statement inside a secure enclave and signs a credit tier: A, B, C or reject. The statement arrives in the format India's Account Aggregator network uses, which is defined by ReBIT's XML schema. Before writing the parser, I opened that schema to see how it describes a transaction amount.
+I'm building [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle), a service that reads a borrower's bank statement inside a secure enclave and signs a credit tier: A, B, C or reject. A lending pool reads that tier on chain. The score has two implementations: the enclave scorer in Rust, and a second scorer, written separately in TypeScript, that produces the expected tier for a set of test statements. The Rust tests fail unless the two agree.
 
-The [DEPOSIT schema](https://specifications.rebit.org.in/api_schema/account_aggregator/documentation/deposit.html) types `Transaction.amount` as `xs:float`.
-
-In XML Schema, [`xs:float`](https://www.w3.org/TR/xmlschema-2/#float) is a 32-bit IEEE floating-point number. Taken literally, ₹1,23,456.78 can't even survive the trip:
-
-```js
-Math.fround(123456.78); // 123456.78125
-Math.fround(12345678.9); // 12345679
-```
-
-The second line is a ₹1.2 crore amount that has lost its paise. JavaScript's own numbers are 64-bit, so they do better, but not well enough for money. This post is about why, and what I did instead.
+So I need the same statement to produce the same tier, every time, in two languages. This post follows one amount through that pipeline: from the bank's text, to exact paise, to arithmetic that both scorers do the same way.
 
 ## Table of contents
 
-## Floats count in halves and quarters
+## A tier that depends on the order of addition
 
-A float stores a number as a binary fraction. Rupee amounts are decimal fractions: a paisa is 1/100 of a rupee. Those two systems don't line up.
+One rule for tier A is about FOIR: monthly loan repayments (EMIs) as a share of monthly income. My policy measures it in whole basis points, rounded down, and tier A allows at most 4,000 (40.00%).
 
-Decimal has the same problem with other numbers. You can't write 1/3 in decimal: it's `0.3333…` forever, because 3 doesn't divide any power of 10. A fraction has a finite decimal expansion only if its denominator, in lowest terms, is made of 2s and 5s.
-
-Binary is stricter. A fraction has a finite binary expansion only if its denominator is a power of 2. So ½ (`0.1` in binary) and ¼ (`0.01`) are exact. But 1/20 = 1/(2² × 5) has a 5 in it, so 0.05 repeats forever in binary, the way 1/3 does in decimal.
-
-A paise ending is k/100 for k from 0 to 99. Reduce that fraction and it has a power-of-two denominator only when k is a multiple of 25. I counted it with a short script instead of trusting my arithmetic:
+Take a ₹50,000 income and three EMIs that add up to ₹20,005.00. That's 40.01%, or 4,001 basis points, so this borrower is not tier A. Here's the check with floats:
 
 ```js
-const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
-const isPowerOfTwo = n => (n & (n - 1)) === 0;
+const income = 50000;
+const emis = [5000.0, 12345.06, 2659.94]; // ₹20,005.00: 40.01%, not tier A
 
-const exact = [];
-for (let k = 0; k < 100; k++) {
-  if (isPowerOfTwo(100 / gcd(k, 100))) exact.push(k);
-}
-// exact: [0, 25, 50, 75]  →  96 of 100 endings are approximations
+const bps = total => Math.floor((total * 10000) / income);
+
+const forward = emis[0] + emis[1] + emis[2]; // 20004.999999999996
+const backward = emis[2] + emis[1] + emis[0]; // 20005
+
+bps(forward); // 4000 → tier A
+bps(backward); // 4001 → not tier A
 ```
 
-Only `.00`, `.25`, `.50` and `.75` are stored exactly. Every other amount is stored as the nearest binary fraction the float can hold:
+Same amounts, same rule, two tiers. Nothing here is a bug in the usual sense: both orders are reasonable, and two programs written separately can easily pick different ones. With floats, they don't have to be wrong to disagree. And in my system the tier gets signed, so a wrong one is a signed claim about a real person.
+
+With integer paise, the order can't matter:
+
+```js
+const emisPaise = [500000n, 1234506n, 265994n];
+const total = emisPaise[0] + emisPaise[1] + emisPaise[2]; // 2000500n
+
+(total * 10000n) / 5000000n; // 4001n in any order → not tier A
+```
+
+## Why floats can't hold most rupee amounts
+
+A float stores a number as a binary fraction. A paisa is a decimal fraction: 1/100 of a rupee.
+
+Decimal has the same problem with other numbers. You can't write 1/3 in decimal; it's `0.3333…` forever, because 3 doesn't divide any power of 10. A fraction ends in decimal only if its denominator, in lowest terms, is made of 2s and 5s. Binary is stricter: the denominator has to be a power of 2. ½ and ¼ are fine. 1/20 has a 5 in it, so 0.05 repeats forever in binary:
 
 ```js
 (0.05).toFixed(30); // "0.050000000000000002775557561563"
-(0.25).toFixed(30); // "0.250000000000000000000000000000"
-
-0.1 + 0.2; // 0.30000000000000004
-
-let total = 0;
-for (let i = 0; i < 10; i++) total += 0.1;
-total; // 0.9999999999999999
 ```
 
-Most of the time the error is far below a paisa and display code rounds it away. That's why floats feel fine for money until the day they aren't.
+A paise ending is k/100, and it reduces to a power-of-two denominator only when k is a multiple of 25. I checked all 100 endings with a script: **96 of the 100 possible paise endings repeat in binary.** Only `.00`, `.25`, `.50` and `.75` can be stored exactly, and only if the whole amount fits the format's precision.
 
-## Why "close enough" isn't enough for a signed score
+That's a statement about endings, not about real transactions, which don't spread evenly across them. But it means that for almost any amount, a float holds something close to the value rather than the value. Each error is tiny. In a sum of hundreds of transactions they add up, and as the example above shows, a tiny error is enough when it lands on a boundary.
 
-For my oracle, a tiny error is not a cosmetic problem, for three reasons.
+## Where the amounts come from
 
-**Errors add up.** A statement has hundreds or thousands of transactions. Each one carries its own small error into every sum.
+The statement arrives in the format India's Account Aggregator network uses. ReBIT defines it as an XML schema, and the [DEPOSIT schema](https://specifications.rebit.org.in/api_schema/account_aggregator/documentation/deposit.html) types `Transaction.amount` as [`xs:float`](https://www.w3.org/TR/xmlschema-2/#float). Balances and limits are `xs:string`, with no pattern.
 
-**The order of addition changes the answer.** Float addition isn't associative: `(a + b) + c` can differ from `a + (b + c)`.
+ReBIT doesn't say why, and it isn't specific to this field. Across the 23 FI type schemas in the [Account Aggregator standards repo](https://github.com/Sahamati/account-aggregator-standards), every number that can have a fraction is `xs:float`; the only other numeric type is `xs:integer`, for unit counts and phone numbers. None uses `xs:decimal`. The deposit schema has typed amounts this way since the earliest version in that repo (April 2021), and version 2.0.0 keeps it. I read it as "this is a number", not as a choice of binary format. Strictly, `xs:float` means a 32-bit float, and taken literally a 32-bit float can't hold ₹1,23,456.78 (it becomes 123456.78125).
 
-<!-- prettier-ignore -->
-```js
-(0.1 + 0.2) + 0.3; // 0.6000000000000001
-0.1 + (0.2 + 0.3); // 0.6
-```
+The schema describes XML, but the data I receive is JSON. In the Account Aggregator's own sample, the same structure is mapped to JSON: attributes become keys, `amount` arrives as a JSON number, and the balances arrive as JSON strings. So my parser sees two forms:
 
-This matters because the score has two implementations. The enclave scorer is written in Rust. A second scorer, written separately in TypeScript, produces the expected tier for a set of test statements, and the Rust tests fail unless they match it. Two programs in two languages will not always add the same numbers in the same order. With floats, they don't have to be wrong to disagree.
+- **JSON numbers**, such as `85000`, `1234.050` or `1.2E7`.
+- **Numeric strings**, such as `"112340.50"`. Here the schema allows any text, so XML-style spellings like `"+5"` and `".5"` can appear too. They aren't valid JSON numbers, only valid inside strings.
 
-**Thresholds flip.** One rule for tier A is that loan repayments (EMIs) are at most 40% of income. Here is a simplified version of that check with three EMIs that add up to exactly ₹20,000.00, which is exactly 40% of a ₹50,000 income:
-
-```js
-const emis = [1000.06, 12345.01, 6654.93]; // ₹20,000.00 in total
-const limit = 50000 * 0.4; // tier A: EMIs ≤ 40% of a ₹50,000 income
-
-const forward = emis[0] + emis[1] + emis[2];
-const backward = emis[2] + emis[1] + emis[0];
-
-forward; // 20000
-backward; // 20000.000000000004
-forward <= limit; // true  → tier A
-backward <= limit; // false → not tier A
-```
-
-Same three amounts, same rule, two different tiers. In my system that tier gets signed and written on chain, so a wrong answer is not a display bug. It's a signed claim about a real person.
-
-The same EMIs as whole paise don't have this problem:
-
-```js
-const emisPaise = [100006, 1234501, 665493];
-emisPaise[0] + emisPaise[1] + emisPaise[2]; // 2000000
-emisPaise[2] + emisPaise[1] + emisPaise[0]; // 2000000
-```
+`1.2E7` is a real possibility, not a curiosity. Java's [`Double.toString`](https://docs.oracle.com/javase/8/docs/api/java/lang/Double.html#toString-double-) writes values of 10⁷ and above in scientific notation, so a producer that uses it sends ₹1.2 crore as `1.2E7`. My first parser accepted only plain decimals with at most two places, and it would have rejected that spelling.
 
 ## Integer paise, parsed from the text
 
-So the money type in the oracle is an integer count of paise:
+The money type in the oracle is a count of paise:
 
 ```rust
 /// Money in integer paise (₹1 = 100 paise). The only money type in
@@ -111,17 +82,13 @@ So the money type in the oracle is an integer count of paise:
 pub struct Paise(i64);
 ```
 
-₹1,234.05 is the integer `123405`. Integer addition is exact and order doesn't matter, in Rust, TypeScript or anything else. The only rounding left in the scorer is explicit: the repayment ratio is computed as `floor(obligations × 10000 / income)` in basis points, and both implementations floor the same way.
+₹1,234.05 is `123405`. Integer sums are exact as long as every intermediate result stays in range, so the Rust scorer adds with checked arithmetic and does ratio maths in `i128`. The TypeScript scorer uses `bigint` with the same bounds.
 
-The harder part is getting the amount into an integer without it ever becoming a float. If the JSON parser reads `1234.05` as a number first, the error is already in before my code sees the value. So the parser works on the raw text of the JSON value and never calls a float conversion.
+The amount has to become an integer without ever becoming a float. If a JSON library turns `1234.05` into a float first, the error is in before my code sees the value. So the parser reads the raw text of each JSON value and never converts through a float. That avoids adding error at this step. It can't recover precision a producer already lost upstream.
 
-My first version was strict: plain decimals, at most two decimal places. Then I asked myself what real systems actually send, and the schema answered. Because `amount` is `xs:float`, all of these are valid spellings: `1.2E7`, `85000.0`, `1234.050`, `+5`, `.5`. Balances are worse: `xs:string` with no pattern at all.
+The rule: **within the supported grammar and range, accept any spelling that is exactly a whole number of paise, and reject everything else. Never round.** Rounding would hide bad bank data inside a signed result.
 
-`1.2E7` is not an edge case. Java's [`Double.toString`](https://docs.oracle.com/javase/8/docs/api/java/lang/Double.html#toString-double-) switches to scientific notation for values of 10⁷ and above, so any Java service that prints a double writes ₹1.2 crore as `1.2E7`. My strict parser would have rejected every statement with a credit of ₹1 crore or more.
-
-So I changed the rule to this: **accept any spelling that is exactly a whole number of paise, and reject everything else. Never round.** Rounding would hide bad bank data inside a signed result.
-
-The parser splits the text into sign, digits and exponent, then works out what power of ten the digits need to be multiplied by to get paise:
+The parser splits the text into sign, digits and exponent, then works out which power of ten turns the digits into paise:
 
 ```rust
 let trailing_zeros = to_i64(digits.len() - significant.len())?;
@@ -131,7 +98,7 @@ if power < 0 {
 }
 ```
 
-The `+ 2` converts rupees to paise. Trailing zeros are folded into the power, so `1234.050` and `1234.05` are the same value. Some examples:
+The `+ 2` converts rupees to paise, and trailing zeros fold into the power, so `1234.050` and `1234.05` are the same value:
 
 | Input      | Significant digits | Power | Result                         |
 | :--------- | :----------------- | :---- | :----------------------------- |
@@ -140,29 +107,29 @@ The `+ 2` converts rupees to paise. Trailing zeros are folded into the power, so
 | `1.2E7`    | `12`               | 8     | 1,20,00,00,000 paise (₹1.2 cr) |
 | `1234.567` | `1234567`          | −1    | rejected: not whole paise      |
 
-A negative power means a fraction of a paisa, which no bank should send, so it's an error, not something to round.
+The supported range has two deliberate limits. Exponents are capped at ±30, and the grammar is checked before any range check, so a hostile `1e999999999` is rejected cheaply. And `i64::MIN` is rejected, so every value the parser returns can be negated safely. The full parser is about 220 lines with comments: [`tio-core/src/money.rs`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/tio-core/src/money.rs).
 
-Two more edge cases took some thought.
+## Rounding that both scorers agree on
 
-**Hostile exponents.** `1e999999999` is a valid number. The parser caps the exponent at ±30 and checks the length of the exponent's digits before parsing them, so a huge exponent costs almost nothing to reject. It also checks the whole grammar before any range check, so a malformed value is always reported as malformed, never as "too big".
+Integers remove accidental rounding, not all rounding. A scorer still divides: FOIR is a ratio, a median of an even number of months falls between two values, and income volatility needs a square root. So every rounding step is written into the spec, and both scorers implement it the same way:
 
-**`i64::MIN`.** A signed 64-bit integer goes one further on the negative side than on the positive side, so negating `i64::MIN` overflows. The parser rejects it, which keeps the range symmetric: every value it returns can be safely negated. There's a test for exactly that boundary.
+- FOIR is `floor(obligations × 10000 / income)` in basis points.
+- An even-length median is the floor of the two middle values' mean.
+- The coefficient of variation uses an integer square root, rounded down.
 
-The full parser is about 220 lines, including comments: [`tio-core/src/money.rs`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/tio-core/src/money.rs).
+The FOIR floor is a policy choice, and it's worth saying plainly what it means: ₹20,000.01 against ₹50,000 is 40.00002%, which floors to 4,000 basis points and still counts as tier A. I'm fine with that band in an eligibility rule, because it's written down and both scorers apply it. If you need "at most 40%" exactly, skip the division and compare products: `obligations × 5 ≤ income × 2`.
 
-## What FinBox does, and why I didn't
+## Other ways to do it
 
-FinBox is an Indian bank-statement analytics provider. Its [BankConnect API](https://docs.finbox.in/bank-connect/rest-api.html) returns money as JSON numbers, for example `"amount": 5188.0` and `"balance": 922.15`, and documents its aggregate fields as `Float`.
+Integer paise isn't the only sound design. Exact decimal types, such as Java's `BigDecimal`, also avoid binary rounding. FinBox's [BankConnect API](https://docs.finbox.in/bank-connect/rest-api.html), a bank-statement analytics service, returns `"amount": 5188.0` and `"balance": 922.15` as JSON numbers and documents its aggregate fields as `Float`. My parser accepts that input, since `5188.0` is an exact number of paise.
 
-For their use case that's reasonable. Analytics output is usually read by a person or fed into a model, and a sub-paisa error changes nothing there.
-
-My output is different: it's a signed claim that a second implementation recomputes, and a lending program acts on it. That makes it closer to a payment than a report. Payment APIs already work this way: [Stripe](https://docs.stripe.com/currencies) takes `1099` to charge 10.99 USD, and [Razorpay](https://razorpay.com/docs/api/orders/create/) takes amounts as integers in the smallest currency sub-unit, which for rupees is paise. So the oracle uses integer paise end to end. It still accepts FinBox-style input like `5188.0`, because that's an exact whole number of paise.
+I chose integers for my own constraints: two languages that must agree to the paisa, arithmetic that is mostly sums and comparisons plus a few specified ratios, and an output that gets signed. Payment APIs work the same way: [Stripe](https://docs.stripe.com/currencies) takes `1099` to charge 10.99 USD, and [Razorpay](https://razorpay.com/docs/api/orders/create/) takes amounts as integers in the smallest currency sub-unit.
 
 ## If you handle money in JavaScript or TypeScript
 
-- **Store and add amounts as integers in the smallest unit.** A JavaScript `number` holds integers exactly up to `Number.MAX_SAFE_INTEGER` (9,007,199,254,740,991). In paise, that's about ₹90 lakh crore, which covers most uses. Use `BigInt` when it might not.
-- **Don't multiply a float by 100 and hope.** `19.99 * 100` is `1998.9999999999998`, and `4.35 * 100` is `434.99999999999994`. Parse the string instead.
-- **Get the raw text if the API sends JSON numbers.** By the time `JSON.parse` hands you `1234.05`, it's already a float. Newer runtimes pass the original text to the reviver (I checked Node 24):
+- **Keep amounts as integers in the smallest unit**, and check intermediate results too, not just amounts. `Number.MAX_SAFE_INTEGER` is about ₹90 lakh crore in paise, but a paise amount times 10,000 leaves the safe range above about ₹900 crore. Use `bigint` when products can get that big.
+- **Don't multiply a float by 100 and hope.** `19.99 * 100` is `1998.9999999999998`. Parse the string.
+- **Get the raw text if an API sends JSON numbers.** Newer runtimes pass the original text to the `JSON.parse` reviver (I checked Node 24):
 
   ```js
   JSON.parse('{"amount": 1234.05}', (key, value, context) =>
@@ -170,8 +137,8 @@ My output is different: it's a signed claim that a second implementation recompu
   ); // { amount: "1234.05" }
   ```
 
-- **Don't round money with `toFixed`.** `(1.005).toFixed(2)` returns `"1.00"`, because 1.005 is actually stored as slightly less than 1.005.
-- **Make rounding explicit, and do it once.** If a ratio needs rounding, pick the rule (floor, half-even), write it down, and use the same rule in every implementation.
-- **Check the spec, not just the sample.** The sample statement I started from had plain decimals. The schema allows much more, and real data can use all of it.
+- **Don't round money with `toFixed`.** `(1.005).toFixed(2)` returns `"1.00"`, because the stored value is slightly below 1.005.
+- **Write the rounding rules down**, and use the same ones in every implementation.
+- **Read the spec, not just the sample.** The sample I started from had plain decimals. The schema allows much more.
 
-Floats count in halves and quarters. Rupees count in hundredths. When the number is going to be signed, keep it in hundredths the whole way through.
+The bank's text becomes exact paise, the arithmetic follows written rules, and the same statement gives the same signed tier in both languages. Floats can't promise the last part, so they stay out of the pipeline.
