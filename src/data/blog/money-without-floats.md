@@ -1,12 +1,12 @@
 ---
 title: "Money without floats: parsing rupees as integer paise"
 description: "Why 96 of 100 paise endings repeat in binary, how that can flip a signed credit tier, and how I parse bank amounts from text into integer paise."
-pubDatetime: 2026-10-27T10:00:00+05:30 # placeholder: set the real time when publishing
+pubDatetime: 2026-10-25T17:41:00+05:30
 tags:
   - fintech
   - rust
   - javascript
-draft: true
+draft: false
 ---
 
 I'm building [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle), a service that reads a borrower's bank statement inside a secure enclave and signs a credit tier: A, B, C or reject. A lending pool reads that tier on chain. The score has two implementations: the enclave scorer in Rust, and a second scorer, written separately in TypeScript, that produces the expected tier for a set of test statements. The Rust tests fail unless the two agree.
