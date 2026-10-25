@@ -1,6 +1,7 @@
 ---
 layout: ../layouts/AboutLayout.astro
 title: "About"
+description: "Senior frontend engineer with seven years of experience, four on consumer credit at Deserve and Intuit. Now building verifiable credit on Solana."
 ---
 
 I'm Prashant, a senior frontend engineer with seven years of experience, the last four building consumer credit products.

@@ -2,5 +2,12 @@
   command = "pnpm run build"
   publish = "dist"
 
+# Serve the site only from the custom domain; the netlify.app copy is a duplicate.
+[[redirects]]
+  from = "https://prashant-chaudhari-personal-website.netlify.app/*"
+  to = "https://prashantchaudhari.dev/:splat"
+  status = 301
+  force = true
+
 [build.environment]
   NODE_VERSION = "20"
