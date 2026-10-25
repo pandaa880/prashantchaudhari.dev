@@ -6,22 +6,22 @@ Built with [Astro](https://astro.build) on the [AstroPaper](https://github.com/s
 
 ## Commands
 
-Requires Node 20.
+Requires Node 20 and pnpm 10 (the exact version is pinned in `packageManager` in `package.json`).
 
-| Command                | Action                                                                     |
-| :--------------------- | :------------------------------------------------------------------------- |
-| `npm install`          | Install dependencies                                                       |
-| `npm run dev`          | Start the dev server at `localhost:4321`                                   |
-| `npm run build`        | Type-check (`astro check`), build to `./dist/` and index search (Pagefind) |
-| `npm run preview`      | Preview the production build locally                                       |
-| `npm run lint`         | Lint with ESLint                                                           |
-| `npm run format:check` | Check formatting with Prettier (`npm run format` to fix)                   |
+| Command             | Action                                                                     |
+| :------------------ | :------------------------------------------------------------------------- |
+| `pnpm install`      | Install dependencies                                                       |
+| `pnpm dev`          | Start the dev server at `localhost:4321`                                   |
+| `pnpm build`        | Type-check (`astro check`), build to `./dist/` and index search (Pagefind) |
+| `pnpm preview`      | Preview the production build locally                                       |
+| `pnpm lint`         | Lint with ESLint                                                           |
+| `pnpm format:check` | Check formatting with Prettier (`pnpm format` to fix)                      |
 
 ## Writing a post
 
 Posts are Markdown files in `src/data/blog/`. The frontmatter schema is in `src/content.config.ts`.
 
-- `draft: true` hides a post everywhere, including `npm run dev`.
+- `draft: true` hides a post everywhere, including `pnpm dev`.
 - A post with a future `pubDatetime` is left out of production builds until 15 minutes before that time (`scheduledPostMargin` in `src/config.ts`). The site is static, so the post goes live on the first build after that.
 
 ## Deployment
