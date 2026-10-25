@@ -1,13 +1,11 @@
 export const SITE = {
-  website: "https://prashantchaudhari.dev/", // replace this with your deployed domain
+  website: "https://prashantchaudhari.dev/",
   author: "Prashant Chaudhari",
   profile: "https://prashantchaudhari.dev/",
   githubUsername: "pandaa880",
-  desc: "Building the modern web, one component at a time.",
-  title: "Prashant",
+  desc: "Senior frontend engineer, seven years in: four on consumer credit products, now building verifiable credit on Solana. Notes on fintech UIs that show their work.",
+  title: "Prashant Chaudhari",
   ogImage: undefined,
-  /** Set to e.g. "/hero.jpg" (file in public/) to show your photo in the hero. Leave undefined for placeholder. */
-  // heroImage: "/profile-picture.jpg",
   lightAndDarkMode: true,
   postPerIndex: 4,
   postPerPage: 4,
@@ -17,7 +15,7 @@ export const SITE = {
   editPost: {
     enabled: true,
     text: "Edit page",
-    url: "https://github.com/pandaa880/prashantchaudhari-dev/edit/main/",
+    url: "https://github.com/pandaa880/prashantchaudhari.dev/edit/main/",
   },
   dynamicOgImage: true,
   dir: "ltr", // "rtl" | "auto"
