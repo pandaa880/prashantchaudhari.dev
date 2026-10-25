@@ -4,7 +4,9 @@ description: "Why 96 of 100 paise endings repeat in binary, how that can flip a 
 pubDatetime: 2026-10-25T17:41:00+05:30
 tags:
   - fintech
+  - floating-point
   - rust
+  - typescript
   - javascript
 draft: false
 ---
@@ -57,15 +59,15 @@ Decimal has the same problem with other numbers. You can't write 1/3 in decimal;
 
 A paise ending is k/100, and it reduces to a power-of-two denominator only when k is a multiple of 25. I checked all 100 endings with a script: **96 of the 100 possible paise endings repeat in binary.** Only `.00`, `.25`, `.50` and `.75` can be stored exactly, and only if the whole amount fits the format's precision.
 
-That's a statement about endings, not about real transactions, which don't spread evenly across them. But it means that for almost any amount, a float holds something close to the value rather than the value. Each error is tiny. In a sum of hundreds of transactions they add up, and as the example above shows, a tiny error is enough when it lands on a boundary.
+That's a statement about endings, not about real transactions, which don't spread evenly across them. For amounts with any of those 96 endings, a binary float holds an approximation. Each error is tiny. Across hundreds of transactions, rounding errors can accumulate, and as the example above shows, a tiny error is enough when it lands on a boundary.
 
 ## Where the amounts come from
 
 The statement arrives in the format India's Account Aggregator network uses. ReBIT defines it as an XML schema, and the [DEPOSIT schema](https://specifications.rebit.org.in/api_schema/account_aggregator/documentation/deposit.html) types `Transaction.amount` as [`xs:float`](https://www.w3.org/TR/xmlschema-2/#float). Balances and limits are `xs:string`, with no pattern.
 
-ReBIT doesn't say why, and it isn't specific to this field. Across the 23 FI type schemas in the [Account Aggregator standards repo](https://github.com/Sahamati/account-aggregator-standards), every number that can have a fraction is `xs:float`; the only other numeric type is `xs:integer`, for unit counts and phone numbers. None uses `xs:decimal`. The deposit schema has typed amounts this way since the earliest version in that repo (April 2021), and version 2.0.0 keeps it. I read it as "this is a number", not as a choice of binary format. Strictly, `xs:float` means a 32-bit float, and taken literally a 32-bit float can't hold ₹1,23,456.78 (it becomes 123456.78125).
+ReBIT doesn't say why, and it isn't specific to this field. Across the 23 FI type schemas in the [Account Aggregator standards repo](https://github.com/Sahamati/account-aggregator-standards), the numeric declarations use `xs:float` and integer types, including `xs:integer` and `xs:positiveInteger`. None uses `xs:decimal`. The deposit schema has typed amounts this way since the earliest version in that repo (April 2021), and version 2.0.0 keeps it. I read it as "this is a number", not as a choice of binary format. Strictly, `xs:float` means a 32-bit float, and taken literally a 32-bit float can't hold ₹1,23,456.78 (it becomes 123456.78125).
 
-The schema describes XML, but the data I receive is JSON. In the Account Aggregator's own sample, the same structure is mapped to JSON: attributes become keys, `amount` arrives as a JSON number, and the balances arrive as JSON strings. So my parser sees two forms:
+The schema describes XML, but the data my service accepts is JSON. [Finvu's sample fetch response](https://finvu.github.io/sandbox/finvu_fiu_integration.html#fetch-data), from the Account Aggregator I target, shows the mapping: attributes become keys, `amount` arrives as a JSON number (`6036`), and balances arrive as JSON strings (`"322644.09"`). So my parser sees two forms:
 
 - **JSON numbers**, such as `85000`, `1234.050` or `1.2E7`.
 - **Numeric strings**, such as `"112340.50"`. Here the schema allows any text, so XML-style spellings like `"+5"` and `".5"` can appear too. They aren't valid JSON numbers, only valid inside strings.
@@ -121,7 +123,7 @@ The FOIR floor is a policy choice, and it's worth saying plainly what it means: 
 
 ## Other ways to do it
 
-Integer paise isn't the only sound design. Exact decimal types, such as Java's `BigDecimal`, also avoid binary rounding. FinBox's [BankConnect API](https://docs.finbox.in/bank-connect/rest-api.html), a bank-statement analytics service, returns `"amount": 5188.0` and `"balance": 922.15` as JSON numbers and documents its aggregate fields as `Float`. My parser accepts that input, since `5188.0` is an exact number of paise.
+Integer paise isn't the only sound design. Exact decimal types, such as Java's `BigDecimal`, also avoid binary rounding.
 
 I chose integers for my own constraints: two languages that must agree to the paisa, arithmetic that is mostly sums and comparisons plus a few specified ratios, and an output that gets signed. Payment APIs work the same way: [Stripe](https://docs.stripe.com/currencies) takes `1099` to charge 10.99 USD, and [Razorpay](https://razorpay.com/docs/api/orders/create/) takes amounts as integers in the smallest currency sub-unit.
 
@@ -141,4 +143,4 @@ I chose integers for my own constraints: two languages that must agree to the pa
 - **Write the rounding rules down**, and use the same ones in every implementation.
 - **Read the spec, not just the sample.** The sample I started from had plain decimals. The schema allows much more.
 
-The bank's text becomes exact paise, the arithmetic follows written rules, and the same statement gives the same signed tier in both languages. Floats can't promise the last part, so they stay out of the pipeline.
+Integer paise keeps the money exact. Specified rounding rules make the remaining calculations reproducible across both implementations. Together, the same statement gives the same signed tier in Rust and in TypeScript.
