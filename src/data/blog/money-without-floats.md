@@ -65,7 +65,7 @@ That's a statement about endings, not about real transactions, which don't sprea
 
 The statement arrives in the format India's Account Aggregator network uses. ReBIT defines it as an XML schema, and the [DEPOSIT schema](https://specifications.rebit.org.in/api_schema/account_aggregator/documentation/deposit.html) types `Transaction.amount` as [`xs:float`](https://www.w3.org/TR/xmlschema-2/#float). Balances and limits are `xs:string`, with no pattern.
 
-ReBIT doesn't say why, and it isn't specific to this field. Across the 23 FI type schemas in the [Account Aggregator standards repo](https://github.com/Sahamati/account-aggregator-standards), the numeric declarations use `xs:float` and integer types, including `xs:integer` and `xs:positiveInteger`. None uses `xs:decimal`. The deposit schema has typed amounts this way since the earliest version in that repo (April 2021), and version 2.0.0 keeps it. I read it as "this is a number", not as a choice of binary format. Strictly, `xs:float` means a 32-bit float, and taken literally a 32-bit float can't hold ₹1,23,456.78 (it becomes 123456.78125).
+ReBIT doesn't say why, and it isn't specific to this field: the whole schema family types numbers this way.[^schemas] I read it as "this is a number", not as a choice of binary format. Strictly, `xs:float` means a 32-bit float, and taken literally a 32-bit float can't hold ₹1,23,456.78 (it becomes 123456.78125).
 
 The schema describes XML, but the data my service accepts is JSON. [Finvu's sample fetch response](https://finvu.github.io/sandbox/finvu_fiu_integration.html#fetch-data), from the Account Aggregator I target, shows the mapping: attributes become keys, `amount` arrives as a JSON number (`6036`), and balances arrive as JSON strings (`"322644.09"`). So my parser sees two forms:
 
@@ -90,7 +90,11 @@ The amount has to become an integer without ever becoming a float. If a JSON lib
 
 The rule: **within the supported grammar and range, accept any spelling that is exactly a whole number of paise, and reject everything else. Never round.** Rounding would hide bad bank data inside a signed result.
 
-The parser splits the text into sign, digits and exponent, then works out which power of ten turns the digits into paise:
+The parser splits the text into a sign, integer digits, fractional digits and an exponent. Then it writes the amount as a whole number times a power of ten, and works out that power.
+
+Take `1234.050`. Joining the integer and fractional digits gives `1234050`, which is the amount with its decimal point moved three places right. So the power starts at `0 + 2 − 3 = −1`: the exponent (none here), plus 2 to turn rupees into paise, minus one for each fractional digit. Removing the trailing zero leaves `123405` and adds one power of ten back, so the final power is `0 + 2 − 3 + 1 = 0`. The result is `123405 × 10⁰`, or 1,23,405 paise. If the power is still below zero at this point, the amount has a fraction of a paisa, and the parser rejects it.
+
+The same calculation in the parser, where `digits` is the joined digits without leading zeros and `significant` is `digits` without trailing zeros:
 
 ```rust
 let trailing_zeros = to_i64(digits.len() - significant.len())?;
@@ -100,7 +104,7 @@ if power < 0 {
 }
 ```
 
-The `+ 2` converts rupees to paise, and trailing zeros fold into the power, so `1234.050` and `1234.05` are the same value:
+Because trailing zeros fold into the power, `1234.050` and `1234.05` come out the same. A few more inputs:
 
 | Input      | Significant digits | Power | Result                         |
 | :--------- | :----------------- | :---- | :----------------------------- |
@@ -119,6 +123,8 @@ Integers remove accidental rounding, not all rounding. A scorer still divides: F
 - An even-length median is the floor of the two middle values' mean.
 - The coefficient of variation uses an integer square root, rounded down.
 
+All three work on non-negative paise. The parser rejects a negative transaction amount, so monthly incomes and EMIs can't drop below zero, and a statement with no income is rejected before FOIR is used. That matters if you port these formulas. Integer division in Rust and with JavaScript's `bigint` truncates toward zero, which equals floor only when the result is non-negative: `-3n / 2n` is `-1n`, but the floor of −1.5 is −2. If your inputs can be negative, write the floor explicitly. In Rust, `div_euclid` does it for a positive divisor.
+
 The FOIR floor is a policy choice, and it's worth saying plainly what it means: ₹20,000.01 against ₹50,000 is 40.00002%, which floors to 4,000 basis points and still counts as tier A. I'm fine with that band in an eligibility rule, because it's written down and both scorers apply it. If you need "at most 40%" exactly, skip the division and compare products: `obligations × 5 ≤ income × 2`.
 
 ## Other ways to do it
@@ -135,12 +141,18 @@ I chose integers for my own constraints: two languages that must agree to the pa
 
   ```js
   JSON.parse('{"amount": 1234.05}', (key, value, context) =>
-    key === "amount" ? context.source : value
+    key === "amount" && typeof value === "number" ? context.source : value
   ); // { amount: "1234.05" }
   ```
+
+  The `typeof` check matters if the field can also arrive as a string. For a JSON string, `context.source` is the original text including its quotes (`'"1234.05"'`), while `value` is already the string you want.
 
 - **Don't round money with `toFixed`.** `(1.005).toFixed(2)` returns `"1.00"`, because the stored value is slightly below 1.005.
 - **Write the rounding rules down**, and use the same ones in every implementation.
 - **Read the spec, not just the sample.** The sample I started from had plain decimals. The schema allows much more.
 
 Integer paise keeps the money exact. Specified rounding rules make the remaining calculations reproducible across both implementations. Together, the same statement gives the same signed tier in Rust and in TypeScript.
+
+If you have a money parser, try it with `1234.05`, `1234.050`, `1.2E7` and `1234.567`. The first two should give the same value, the third should keep its full value (₹1.2 crore), and the last should fail rather than round.
+
+[^schemas]: Across the 23 FI type schemas in the [Account Aggregator standards repo](https://github.com/Sahamati/account-aggregator-standards), the numeric declarations use `xs:float` and integer types, including `xs:integer` and `xs:positiveInteger`. None uses `xs:decimal`. The deposit schema has typed amounts this way since the earliest version in that repo (April 2021), and version 2.0.0 keeps it.
