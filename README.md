@@ -1,23 +1,32 @@
-# Prashant Chaudhari's Personal Website
+# prashantchaudhari.dev
 
-This is the source code for my personal website, built with [Astro](https://astro.build) and deployed on [Vercel](https://vercel.com).
+Source for [prashantchaudhari.dev](https://prashantchaudhari.dev), my personal site and blog. I write about frontends that verify instead of trusting, fintech engineering, and frontend craft.
 
-## About
-
-I'm Prashant Chaudhari. This website hosts my personal blog and information about my work.
+Built with [Astro](https://astro.build) on the [AstroPaper](https://github.com/satnaing/astro-paper) theme, deployed on [Netlify](https://www.netlify.com).
 
 ## Commands
 
-| Command           | Action                                      |
-| :---------------- | :------------------------------------------ |
-| `npm install`     | Installs dependencies                       |
-| `npm run dev`     | Starts local dev server at `localhost:4321` |
-| `npm run build`   | Build the production site to `./dist/`      |
-| `npm run preview` | Preview the build locally, before deploying |
+Requires Node 20.
+
+| Command                | Action                                                                     |
+| :--------------------- | :------------------------------------------------------------------------- |
+| `npm install`          | Install dependencies                                                       |
+| `npm run dev`          | Start the dev server at `localhost:4321`                                   |
+| `npm run build`        | Type-check (`astro check`), build to `./dist/` and index search (Pagefind) |
+| `npm run preview`      | Preview the production build locally                                       |
+| `npm run lint`         | Lint with ESLint                                                           |
+| `npm run format:check` | Check formatting with Prettier (`npm run format` to fix)                   |
+
+## Writing a post
+
+Posts are Markdown files in `src/data/blog/`. The frontmatter schema is in `src/content.config.ts`.
+
+- `draft: true` hides a post everywhere, including `npm run dev`.
+- A post with a future `pubDatetime` is left out of production builds until 15 minutes before that time (`scheduledPostMargin` in `src/config.ts`). The site is static, so the post goes live on the first build after that.
 
 ## Deployment
 
-This site is set up for easy deployment on Netlify. Just connect your GitHub repository to Netlify, and it will automatically build and deploy the site when changes are pushed.
+Netlify builds `main` using `netlify.toml` and publishes a deploy preview for every pull request. GitHub Actions runs lint, the format check and the build on every pull request.
 
 ## License
 
