@@ -32,6 +32,8 @@ policy: <policy hash>
 expires: <unix seconds>
 ```
 
+The policy hash identifies the scoring rules the enclave will apply; each pool says which policy it accepts.
+
 **The shortcut:** the gateway sends this text, the page passes it to the wallet, and the wallet signs it.
 
 **What can go wrong:** the gateway now holds the pen. Whatever it puts in that text gets signed: a different wallet, an expiry next year, a policy no pool lends under. In the demo the wallet lives in the browser tab and signs without a prompt, so nobody reads the text first.
@@ -54,17 +56,17 @@ const signature = getBase58Encoder().encode(returnedId);
 return verifySignature(relayerKey, signature, messageBytes);
 ```
 
-A signature over any other message fails, so the id is tied to the transaction the borrower actually signed. One gap remains: two identical borrows built on the same recent blockhash produce identical bytes, and so the same signature. The page closes most of that by fetching a fresh blockhash for every transaction and still reading the loan account after confirmation, which a reused id can't change. (The excerpt is condensed from `isOurTransaction` in [`use-loan.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/web/src/app/use-loan.ts).)
+A signature over any other message fails, so the id is tied to these exact message bytes. That isn't complete replay protection. Two identical borrows built on the same blockhash produce identical bytes, and so the same signature, and asking for the latest blockhash each time doesn't guarantee a different one. The page also reads the loan account after confirmation, which makes accidental reuse less likely to slip through. But that read has no lower bound on how fresh it must be, so a stale node could still show the state the page expects. (The excerpt is condensed from `isOurTransaction` in [`use-loan.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/web/src/app/use-loan.ts).)
 
 ## 3. Show what the chain says, not what the server says
 
-When scoring finishes, the gateway streams the result: the tier, and the record it says the oracle wrote to Solana.
+When scoring finishes, the gateway streams the result: the tier, and the payload it says the oracle wrote to Solana. The payload is the signed part of the on-chain record, including the tier, the policy, the statement dates and the enclave build that scored it.
 
 **The shortcut:** show the tier straight away, and read the chain for extra details. My first version did this. A reviewer described it as the gateway's word with a seal on it.
 
 **What can go wrong:** the page looks verified while showing an unverified value. My first fix had a subtler hole. It matched the chain record to the gateway's report by timestamp, then kept displaying the gateway's tier. A gateway could relay a real tier C record and report tier A with the same timestamp. The timestamps match, and the page says A.
 
-**What the page does:** it shows "reading your tier back from Solana…" until a chain read holds a record identical to the report, field by field. Every value on the result screen then comes from that chain read. If a record at least as new as the report differs in any field, the page shows an error. That doesn't prove the gateway lied, because the oracle lets a newer record replace an older one, but the chain no longer confirms the report, so the page fails closed. ([`borrow-view.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/web/src/domain/borrow-view.ts))
+**What the page does:** it shows "reading your tier back from Solana…" until the payload on chain matches the reported payload, field by field. It then displays that payload and the record's expiry, both as read from Solana. If a payload at least as new as the report differs in any field, the page shows an error. That doesn't prove the gateway lied, because the oracle lets a newer record replace an older one, but the chain no longer confirms the report, so the page fails closed. ([`borrow-view.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/web/src/domain/borrow-view.ts))
 
 The same mistake hid in a smaller place. A "registered on Solana" chip was fed by a gateway endpoint. Now only a read of the on-chain registry can say "registered". The gateway still moves the page from one step to the next, and it supplies the link to its transaction. It never supplies a value the page shows as fact.
 
@@ -102,7 +104,7 @@ await queryClient.cancelQueries({ queryKey: poolKey });
 queryClient.setQueryData(poolKey, provingRead);
 ```
 
-That fixes the race I saw, and no more. A later refetch, say when the tab regains focus, can still hit a lagging node. Solana's RPC has a parameter for the general case, `minContextSlot`: every response says which slot it was read at, and if you pass that slot on later requests, a node that hasn't reached it returns an error instead of older data. The page doesn't do this yet.
+That fixes the race I saw, and no more. A later refetch, say when the tab regains focus, can still hit a lagging node. Solana's RPC has a parameter for the general case, `minContextSlot`. Account reads such as `getMultipleAccounts` return the slot they were evaluated at in `context.slot`. Keep the highest slot you've accepted, pass it as `minContextSlot` on later reads with the same commitment level, and a node that hasn't reached that slot returns an error instead of older data. The page doesn't do this yet.
 
 **A reply that's one short.** The funders' loan book asks for up to 100 accounts per call and matches each reply to its request by position. Nothing checked the reply's length. A node that returned 99 accounts for 100 addresses would shift every row after the gap, and show one borrower with the next borrower's "fresh" badge. Now a reply of the wrong length is an error ([`rpc.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/web/src/adapters/rpc.ts)). So is a duplicated loan row, which would inflate every total, and so is a record that doesn't name the borrower it was fetched for. One bad row fails the whole book ([`use-book.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/web/src/app/use-book.ts)), because a partial book presented as the book is worse than an error.
 
@@ -111,7 +113,7 @@ That fixes the race I saw, and no more. A later refetch, say when the tab regain
 None of this makes the page trustless:
 
 - **It reads one RPC node.** It checks what's cheap to check: reply lengths, account sizes and types, which wallet a record belongs to, and signatures over bytes it built. A node that invented consistent data could still fool it.
-- **"Confirmed" also comes from that node.** The signature check proves the id belongs to the right transaction; the node still reports whether it landed.
+- **"Confirmed" also comes from that node.** The signature check proves the id belongs to the bytes the page built; the node still reports whether they landed.
 - **I serve the page.** A different build could skip every check. That's why the source is public at release tags, and why the receipt checks also run from a command line.
 
 What the checks do buy: my gateway can't make the page show a tier, a loan or a registration that isn't on chain. A bug in the gateway shows up as an error on screen, not as a wrong number a lender acts on.
@@ -119,10 +121,10 @@ What the checks do buy: my gateway can't make the page show a tier, a loan or a 
 ## A checklist for your own frontend
 
 - **Rebuild anything the user signs** from data you already hold, and sign your copy.
-- **Treat a signature from an API as a claim.** If you built the transaction, verify the signature over its bytes, and still read the state it should have changed.
-- **Show values from a chain read**, not from the API that triggered the write. Compare whole records, and fail closed when they differ.
+- **Treat a signature from an API as a claim.** If you built the transaction, verify the signature over its bytes. It ties the id to those bytes; it doesn't stop an identical transaction being reused.
+- **Show values from a chain read**, not from the API that triggered the write. Compare every field the API reported, display the chain's values, and fail closed when they differ.
 - **Make a status badge mirror the program's checks**, in the program's order, and say what it doesn't cover.
-- **After a write, keep the read that proved it.** For later reads, pass its slot as `minContextSlot`.
+- **After a write, keep the read that proved it.** For later reads, carry the highest slot you've accepted forward as `minContextSlot`.
 - **Check reply lengths** whenever you match results to requests by position.
 
 To try this on your own app, pick one value your UI shows as confirmed, and trace where it comes from. If the answer is "the API told us", that's the first check to add.
