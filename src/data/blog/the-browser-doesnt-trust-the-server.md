@@ -55,6 +55,7 @@ To borrow, the page builds a transaction and the borrower signs it. The gateway'
 ```ts
 const { messageBytes } = getTransactionDecoder().decode(wire);
 const signature = getBase58Encoder().encode(returnedId);
+if (!isSignatureBytes(signature)) return false;
 return verifySignature(relayerKey, signature, messageBytes);
 ```
 
