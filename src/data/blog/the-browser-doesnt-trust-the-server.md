@@ -22,7 +22,7 @@ This post is for frontend developers building on Solana. You know transactions, 
 
 ## 1. Sign your own copy
 
-Before scoring starts, the borrower signs a short text that ties the session to their wallet. It's an off-chain message signature, the same kind a wallet's `signMessage` produces, not a transaction:
+Before scoring starts, the borrower signs a short text that ties the session to their wallet. It's a plain message signature, the kind a wallet's `signMessage` produces, not a transaction:
 
 ```text
 tee-income-oracle: bind session
@@ -40,6 +40,8 @@ The policy hash identifies the scoring rules the enclave will apply; each pool s
 
 **What the page does:** it writes the text itself and signs its own copy, and only if the gateway's copy is identical. The wallet line comes from the page alone. The other values come from the gateway, so the page can only hold them to rules: the session id must be this session's, the policy must be one a listed pool lends under, and the expiry must fall within the next ten minutes (plus a minute for clock skew). A gateway can still choose the session and the policy within those rules. It can't get a signature for anything else. ([`intent.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/web/src/domain/intent.ts))
 
+This isn't a quirk of my setup. Kit's documentation for [signing off-chain messages](https://github.com/anza-xyz/kit/blob/main/packages/offchain-messages/README.md) makes the same argument from the other side: a valid signature from a wallet proves little until you've also confirmed it covers the message you meant to have signed.
+
 ## 2. Check that the signature you got back is yours
 
 To borrow, the page builds a transaction and the borrower signs it. The gateway's relayer pays the fee, so it signs too, sends the transaction, and returns its signature. The page polls that signature until it's confirmed.
@@ -56,7 +58,7 @@ const signature = getBase58Encoder().encode(returnedId);
 return verifySignature(relayerKey, signature, messageBytes);
 ```
 
-A signature over any other message fails, so the id is tied to these exact message bytes. That still isn't complete replay protection. Two identical borrows built on the same blockhash produce identical bytes and the same signature, and asking for the latest blockhash each time doesn't guarantee a different one. The chain is safe either way: validators drop a transaction whose signature they've already processed, so nothing executes twice. The risk is to what the page believes. A relayer could answer a new, identical request with the signature of the earlier one, which did confirm. The page also reads the loan account after confirmation, which makes that harder to slip through, but the read has no lower bound on how fresh it must be, so a stale node could still show the state the page expects. (The excerpt is condensed from `isOurTransaction` in [`use-loan.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/web/src/app/use-loan.ts).)
+Solana's own [guide to partial signing](https://solana.com/docs/core/transactions/partial-signing) recommends this check whenever a backend or sponsor pays the fee: check each signature you get back against the exact message bytes and the key you expected. A signature over any other message fails, so the id is tied to these exact message bytes. That still isn't complete replay protection. Two identical borrows built on the same blockhash produce identical bytes and the same signature, and asking for the latest blockhash each time doesn't guarantee a different one. The chain is safe either way: validators drop a transaction whose signature they've already processed, so nothing executes twice. The risk is to what the page believes. A relayer could answer a new, identical request with the signature of the earlier one, which did confirm. The page also reads the loan account after confirmation, which makes that harder to slip through, but the read has no lower bound on how fresh it must be, so a stale node could still show the state the page expects. (The excerpt is condensed from `isOurTransaction` in [`use-loan.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/web/src/app/use-loan.ts).)
 
 ## 3. Show what the chain says, not what the server says
 
