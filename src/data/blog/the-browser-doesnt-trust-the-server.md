@@ -22,7 +22,7 @@ This post is for frontend developers building on Solana. You know transactions, 
 
 ## 1. Sign your own copy
 
-Before scoring starts, the borrower signs a short text that ties the session to their wallet:
+Before scoring starts, the borrower signs a short text that ties the session to their wallet. It's an off-chain message signature, the same kind a wallet's `signMessage` produces, not a transaction:
 
 ```text
 tee-income-oracle: bind session
@@ -48,7 +48,7 @@ To borrow, the page builds a transaction and the borrower signs it. The gateway'
 
 **What can go wrong:** every confirmed transaction has a signature. A buggy or hostile relayer could hand back one from an earlier borrow, or from someone else's, and the page would celebrate a loan that never happened. Reading the loan account afterwards helps, but on public RPC that read can come from a node that's behind.
 
-**What the page does:** on Solana, a transaction's id is its first signature, and the first signature belongs to the fee payer, signed over the transaction's message bytes. The fee payer here is the relayer. So the page checks that the returned id is a valid relayer signature over the exact bytes it built:
+**What the page does:** on Solana, a transaction's id is its first signature, and the first signature belongs to the fee payer, signed over the transaction's message bytes. The fee payer here is the relayer. So the page checks that the returned id is a valid relayer signature over the exact bytes it built. With [`@solana/kit`](https://github.com/anza-xyz/kit) (the library formerly released as web3.js 2.0), that's a decode and a verify:
 
 ```ts
 const { messageBytes } = getTransactionDecoder().decode(wire);
@@ -56,7 +56,7 @@ const signature = getBase58Encoder().encode(returnedId);
 return verifySignature(relayerKey, signature, messageBytes);
 ```
 
-A signature over any other message fails, so the id is tied to these exact message bytes. That isn't complete replay protection. Two identical borrows built on the same blockhash produce identical bytes, and so the same signature, and asking for the latest blockhash each time doesn't guarantee a different one. The page also reads the loan account after confirmation, which makes accidental reuse less likely to slip through. But that read has no lower bound on how fresh it must be, so a stale node could still show the state the page expects. (The excerpt is condensed from `isOurTransaction` in [`use-loan.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/web/src/app/use-loan.ts).)
+A signature over any other message fails, so the id is tied to these exact message bytes. That still isn't complete replay protection. Two identical borrows built on the same blockhash produce identical bytes and the same signature, and asking for the latest blockhash each time doesn't guarantee a different one. The chain is safe either way: validators drop a transaction whose signature they've already processed, so nothing executes twice. The risk is to what the page believes. A relayer could answer a new, identical request with the signature of the earlier one, which did confirm. The page also reads the loan account after confirmation, which makes that harder to slip through, but the read has no lower bound on how fresh it must be, so a stale node could still show the state the page expects. (The excerpt is condensed from `isOurTransaction` in [`use-loan.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/web/src/app/use-loan.ts).)
 
 ## 3. Show what the chain says, not what the server says
 
@@ -106,7 +106,7 @@ queryClient.setQueryData(poolKey, provingRead);
 
 That fixes the race I saw, and no more. A later refetch, say when the tab regains focus, can still hit a lagging node. Solana's RPC has a parameter for the general case, `minContextSlot`. Account reads such as `getMultipleAccounts` return the slot they were evaluated at in `context.slot`. Keep the highest slot you've accepted, pass it as `minContextSlot` on later reads with the same commitment level, and a node that hasn't reached that slot returns an error instead of older data. The page doesn't do this yet.
 
-**A reply that's one short.** The funders' loan book asks for up to 100 accounts per call and matches each reply to its request by position. Nothing checked the reply's length. A node that returned 99 accounts for 100 addresses would shift every row after the gap, and show one borrower with the next borrower's "fresh" badge. Now a reply of the wrong length is an error ([`rpc.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/web/src/adapters/rpc.ts)). So is a duplicated loan row, which would inflate every total, and so is a record that doesn't name the borrower it was fetched for. One bad row fails the whole book ([`use-book.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/web/src/app/use-book.ts)), because a partial book presented as the book is worse than an error.
+**A reply that's one short.** The funders' loan book asks for up to 100 accounts per call and matches each reply to its request by position. Nothing checked the reply's length. The RPC spec says a node returns one entry per address, with `null` for an account that doesn't exist, but the page took that on trust. A node, or a proxy in front of one, that returned 99 accounts for 100 addresses would shift every row after the gap, and show one borrower with the next borrower's "fresh" badge. Now a reply of the wrong length is an error ([`rpc.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/web/src/adapters/rpc.ts)). So is a duplicated loan row, which would inflate every total, and so is a record that doesn't name the borrower it was fetched for. One bad row fails the whole book ([`use-book.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/web/src/app/use-book.ts)), because a partial book presented as the book is worse than an error.
 
 ## Where the trust actually stops
 
