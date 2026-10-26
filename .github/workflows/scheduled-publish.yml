@@ -1,0 +1,42 @@
+# Publishes scheduled blog posts. Finish the post PR (a real pubDatetime with
+# its offset, draft: false), then label it:
+#   gh pr edit <number> --add-label scheduled
+# Every 30 minutes this merges (squash) any labelled PR whose posts are all due,
+# once its checks are green and it merges cleanly. The merge pushes to main and
+# Netlify deploys it. Scheduled runs can start late, so expect the post within
+# about 30-60 minutes of its pubDatetime. Logic: .github/scripts/scheduled-publish.sh.
+name: Scheduled publish
+
+on:
+  schedule:
+    # Off the hour: GitHub delays or drops scheduled runs at :00 and :30.
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Log what would be merged without merging
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: scheduled-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Merge due posts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "☁️ Checkout repository"
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: "🗓️ Merge scheduled PRs that are due"
+        run: .github/scripts/scheduled-publish.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
