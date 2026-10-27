@@ -1,13 +1,13 @@
 ---
 title: "The browser doesn't trust the server: a Solana frontend that checks its own backend"
 description: "My server can tell the page a borrower got tier A. The page doesn't show it until Solana agrees. Five checks a Solana frontend can run on its own backend."
-pubDatetime: 2026-11-01T10:00:00+05:30
+pubDatetime: 2026-10-31T15:30:00+05:30
 tags:
   - solana
   - frontend
   - typescript
   - security
-draft: true
+draft: false
 ---
 
 My server can tell the web page that a borrower got credit tier A. The page doesn't show it until Solana agrees.
