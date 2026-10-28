@@ -97,7 +97,7 @@ The idea is simple: read the amount as text, move the decimal point two places t
 | `1.2E7`    | 1,20,00,00,000 paise (₹1.2 crore)                       |
 | `1234.567` | rejected: the last digit would be a fraction of a paisa |
 
-The code works with digit counts rather than moving a character around, so scientific notation goes through the same path as a plain decimal. It also turns away anything too big to be a real amount, such as a hostile `1e999999999`, before doing any arithmetic. The full parser is about 220 lines with comments: [`tio-core/src/money.rs`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.3/tio-core/src/money.rs).
+The code works with digit counts rather than moving a character around, so scientific notation goes through the same path as a plain decimal. It also turns away anything too big to be a real amount, such as a hostile `1e999999999`, before doing any arithmetic. The full parser is about 220 lines with comments: [`tio-core/src/money.rs`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.5/tio-core/src/money.rs).
 
 ## Rounding that both scorers agree on
 
