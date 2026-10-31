@@ -53,10 +53,16 @@ To borrow, the page builds a transaction and the borrower signs it. The gateway'
 **What the page does:** on Solana, a transaction's id is its first signature, and the first signature belongs to the fee payer, signed over the transaction's message bytes. The fee payer here is the relayer. So the page checks that the returned id is a valid relayer signature over the exact bytes it built. With [`@solana/kit`](https://github.com/anza-xyz/kit) (the library formerly released as web3.js 2.0), that's a decode and a verify:
 
 ```ts
-const { messageBytes } = getTransactionDecoder().decode(wire);
-const signature = getBase58Encoder().encode(returnedId);
-if (!isSignatureBytes(signature)) return false;
-return verifySignature(relayerKey, signature, messageBytes);
+async function isOurTransaction(
+  wire: Uint8Array,
+  returnedId: string,
+  relayerKey: CryptoKey,
+): Promise<boolean> {
+  const { messageBytes } = getTransactionDecoder().decode(wire);
+  const signature = getBase58Encoder().encode(returnedId);
+  if (!isSignatureBytes(signature)) return false;
+  return verifySignature(relayerKey, signature, messageBytes);
+}
 ```
 
 Solana's [guide to partial signing](https://solana.com/docs/core/transactions/partial-signing) gives a similar rule to whoever assembles a transaction from several signers: before you submit, make sure each signature you collected is over the message you froze. The page applies it from the other end, after submission, to the one id that comes back. A signature over any other message fails, so the id is tied to these exact message bytes. (The excerpt is condensed from `isOurTransaction` in [`use-loan.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.5/web/src/app/use-loan.ts).)
