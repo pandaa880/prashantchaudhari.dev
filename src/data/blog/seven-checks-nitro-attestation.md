@@ -84,10 +84,13 @@ The signature scheme here, ECDSA, has a quirk: every valid signature has a twin.
 AWS's Nitro signer doesn't always produce the low-S form. One of my three archived documents has the other one, so with noble's default settings, a genuine AWS signature failed. With `lowS: false`, it passes. I checked both on the real document.
 
 ```ts
-return p384.verify(cose.signature, sha384(sigStructure(cose)), publicKeyPoint, {
-  lowS: false,
-  prehash: false,
-});
+// sigStructure wraps the payload bytes exactly as they arrived.
+const valid = p384.verify(
+  cose.signature,
+  sha384(sigStructure(cose)),
+  publicKeyPoint,
+  { lowS: false, prehash: false },
+);
 ```
 
 Turning that rule off is safe here. The rule matters where a signature works as an id, like a transaction id, so a twin could pass as a different transaction. Here, a signature is evidence about a document whose hash is already on Solana. Its twin proves nothing new.
@@ -128,11 +131,10 @@ The first version even showed "UNEXPECTED signer" on screen, and still printed P
 ```ts
 export function verdictOf(
   checks: Check[],
-  attestation: Pick<AttestationFacts, "signerOk">
+  attestation: Pick<AttestationFacts, "signerOk">,
 ): Verdict {
-  return attestation.signerOk && checks.every(c => c.status === "pass")
-    ? "PASS"
-    : "FAIL";
+  const allChecksPass = checks.every((check) => check.status === "pass");
+  return attestation.signerOk && allChecksPass ? "PASS" : "FAIL";
 }
 ```
 
