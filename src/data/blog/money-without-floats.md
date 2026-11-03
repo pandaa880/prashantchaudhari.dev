@@ -27,7 +27,7 @@ Take a ₹50,000 income and three EMIs that add up to ₹20,005.00. That's 40.01
 const income = 50000;
 const emis = [5000.0, 12345.06, 2659.94]; // ₹20,005.00: 40.01%, not tier A
 
-const bps = total => Math.floor((total * 10000) / income);
+const bps = (total) => Math.floor((total * 10000) / income);
 
 const forward = emis[0] + emis[1] + emis[2]; // 20004.999999999996
 const backward = emis[2] + emis[1] + emis[0]; // 20005
@@ -119,7 +119,7 @@ I chose integers for my own constraints: two languages that must agree to the pa
 
   ```js
   JSON.parse('{"amount": 1234.05}', (key, value, context) =>
-    key === "amount" && typeof value === "number" ? context.source : value
+    key === "amount" && typeof value === "number" ? context.source : value,
   ); // { amount: "1234.05" }
   ```
 

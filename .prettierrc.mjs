@@ -18,5 +18,13 @@ export default {
         parser: "astro",
       },
     },
+    {
+      // Code samples in posts follow Prettier's defaults, which readers know.
+      files: "src/data/blog/**/*.md",
+      options: {
+        arrowParens: "always",
+        trailingComma: "all",
+      },
+    },
   ],
 };
