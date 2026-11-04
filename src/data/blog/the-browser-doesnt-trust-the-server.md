@@ -16,7 +16,7 @@ That sounds like paranoia about my own code, so here's the context. I'm building
 
 The whole product claims that a lender doesn't have to trust me. If the page repeats whatever my gateway says, that claim stops at the page. So the page treats the gateway as a messenger: it can carry bytes, but it never becomes the source of anything the page calls verified.
 
-This post is for frontend developers building on Solana. You know transactions, signatures and RPC calls; you don't need to know anything about enclaves. It walks through five places the page checks its own backend, each as the shortcut, what can go wrong with it, and what the page does instead. The page still trusts two things, the RPC node it reads from and the code I serve it, and I'll come back to both at the end. Every link points to release [v0.5.5](https://github.com/pandaa880/tee-income-oracle/tree/v0.5.5/web/src).
+This post is for frontend developers building on Solana. You know transactions, signatures and RPC calls; you don't need to know anything about enclaves. It walks through five places the page checks its own backend, each as the shortcut, what can go wrong with it, and what the page does instead. The page still trusts three things: the RPC node it reads from, the relayer key my gateway names, and the code I serve it. I'll come back to all three at the end. Every link points to release [v0.5.5](https://github.com/pandaa880/tee-income-oracle/tree/v0.5.5/web/src).
 
 ## Table of contents
 
@@ -38,9 +38,9 @@ The policy hash identifies the scoring rules the enclave will apply; each pool s
 
 **What can go wrong:** the gateway now holds the pen. Whatever it puts in that text gets signed: a different wallet, an expiry next year, a policy no pool lends under. In the demo the wallet lives in the browser tab and signs without a prompt, so nobody reads the text first.
 
-**What the page does:** it writes the text itself and signs its own copy, and only if the gateway's copy is identical. The wallet line comes from the page alone. The other values come from the gateway, so the page can only hold them to rules: the session id must match the session the page will submit under, the policy must be one a listed pool lends under, and the expiry must fall within the next ten minutes (plus a minute for clock skew). A gateway can still choose the session and the policy within those rules. It can't get a signature for anything else. ([`intent.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.5/web/src/domain/intent.ts))
+**What the page does:** it writes the text itself and compares it with the gateway's copy. It signs only when the two are identical. The comparison matters because the enclave rebuilds the same text and checks the signature against its own copy, so the page has to sign exactly what the enclave will check. The wallet line comes from the page alone. The other values come from the gateway, so the page can only hold them to rules: the session id must match the session the page will submit under, the policy must be one a listed pool lends under, and the expiry must fall within the next ten minutes (plus a minute for clock skew). A gateway can still choose the session and the policy within those rules. It can't get a signature for anything else. ([`intent.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.5/web/src/domain/intent.ts))
 
-This isn't a quirk of my setup. Kit's documentation for [signing off-chain messages](https://github.com/anza-xyz/kit/blob/d50fc28223a537e8cc66c137e818cc79ed52b5d7/packages/offchain-messages/README.md) makes the same argument from the other side: a valid signature from a wallet proves little until you've also confirmed it covers the message you meant to have signed.
+This isn't a quirk of my setup. [`@solana/kit`](https://github.com/anza-xyz/kit), Solana's JavaScript library (formerly released as web3.js 2.0), makes the same argument from the other side in its documentation for [signing off-chain messages](https://github.com/anza-xyz/kit/blob/d50fc28223a537e8cc66c137e818cc79ed52b5d7/packages/offchain-messages/README.md): a valid signature from a wallet proves little until you've also confirmed it covers the message you meant to have signed.
 
 ## 2. Check that the signature you got back is yours
 
@@ -50,7 +50,7 @@ To borrow, the page builds a transaction and the borrower signs it. The gateway'
 
 **What can go wrong:** every confirmed transaction has a signature. A buggy or hostile relayer could hand back one from an earlier borrow, or from someone else's, and the page would celebrate a loan that never happened. Reading the loan account afterwards helps, but on public RPC that read can come from a node that's behind.
 
-**What the page does:** on Solana, a transaction's id is its first signature, and the first signature belongs to the fee payer, signed over the transaction's message bytes. The fee payer here is the relayer. So the page checks that the returned id is a valid relayer signature over the exact bytes it built. With [`@solana/kit`](https://github.com/anza-xyz/kit) (the library formerly released as web3.js 2.0), that's a decode and a verify:
+**What the page does:** on Solana, a transaction's id is its first signature, and the first signature belongs to the fee payer, signed over the transaction's message bytes. The fee payer here is the relayer. So the page checks that the returned id is a valid relayer signature over the exact bytes it built. With Kit, that's a decode and a verify:
 
 ```ts
 async function isOurTransaction(
@@ -67,13 +67,18 @@ async function isOurTransaction(
 
 Solana's [guide to partial signing](https://solana.com/docs/core/transactions/partial-signing) gives a similar rule to whoever assembles a transaction from several signers: before you submit, make sure each signature you collected is over the message you froze. The page applies it from the other end, after submission, to the one id that comes back. A signature over any other message fails, so the id is tied to these exact message bytes. (The excerpt is condensed from `isOurTransaction` in [`use-loan.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.5/web/src/app/use-loan.ts).)
 
-That still isn't complete replay protection. Ed25519 signatures are deterministic: the same key signing the same bytes always gives the same signature. So two identical borrows built on the same blockhash have the same id, and asking for the latest blockhash each time doesn't guarantee a different one. The chain is safe either way: validators drop a transaction they've already processed, so nothing executes twice. The risk is to what the page believes. Before relaying, the page reads the loan account and refuses to borrow while a loan is open, so a replay needs a repay in between: borrow, repay, then an identical borrow while the blockhash is still valid, about a minute. A relayer could answer that last borrow with the first one's signature, which did confirm. The page reads the loan account again after confirmation, but that read has no lower bound on freshness, so a node still showing the first loan would let it through.
+That still isn't complete replay protection. Ed25519 signatures are deterministic: the same key signing the same bytes always gives the same signature, so two identical transactions have the same id. The chain is safe either way: validators drop a transaction they've already processed, so nothing executes twice. The risk is to what the page believes, and it takes four steps:
+
+1. The borrower borrows, and it confirms.
+2. The borrower repays. The page refuses to borrow while a loan is open, so a repay has to come first.
+3. Within about a minute, while the blockhash is still valid, the borrower borrows the same amount again. Asking for the latest blockhash doesn't guarantee a new one, so the bytes can be identical.
+4. The relayer answers with the first borrow's id, which did confirm. The page reads the loan account after confirmation, but that read has no lower bound on freshness, so a node still showing the first loan lets it through.
 
 ## 3. Show what the chain says, not what the server says
 
 When scoring finishes, the gateway streams the result: the tier, and the payload it says the oracle wrote to Solana. The payload is the signed part of the on-chain record, including the tier, the policy, the statement dates and the enclave build that scored it.
 
-**The shortcut:** show the tier straight away, and read the chain for extra details. My first version did this. A reviewer described it as the gateway's word with a seal on it.
+**The shortcut:** show the tier straight away, and read the chain for extra details. My first version did this. My AI code reviewer described it as the gateway's word with a seal on it.
 
 **What can go wrong:** the page looks verified while showing an unverified value. My first fix had a subtler hole. It matched the chain record to the gateway's report by timestamp, then kept displaying the gateway's tier. A gateway could relay a real tier C record and report tier A with the same timestamp. The timestamps match, and the page says A.
 
@@ -85,7 +90,7 @@ The same mistake hid in a smaller place. A "registered on Solana" chip was fed b
 
 The loan page shows a badge for the borrower's tier against a pool: valid, stale, expired, policy mismatch and so on.
 
-**The shortcut:** check the rules that seem important. My first version did that, and review found four of the pool's checks missing. The badge could say "valid" about a credential the program would reject.
+**The shortcut:** check the rules that seem important. My first version did that, and the same reviewer found four of the pool's checks missing. The badge could say "valid" about a credential the program would reject.
 
 **What the page does:** it runs every credential check the pool program runs, in the program's order:
 
@@ -98,7 +103,7 @@ The loan page shows a badge for the borrower's tier against a pool: valid, stale
 
 The order matters because the badge names the first check that fails, and that should match what the program would say about the same credential. ([`credential.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.5/web/src/domain/credential.ts), [`borrow.rs`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.5/programs/demo-pool/src/instructions/borrow.rs))
 
-Even then, "valid" makes a narrow promise: the credential passes this pool's checks at the state and time the page read. A borrow can still fail for reasons outside the credential: the amount is over the tier's limit, there's already a loan in this pool, the vault is short, a token account is frozen, or the state changes before the transaction runs. The funders' loan book runs the same function for every borrower, so "fresh" there makes the same narrow promise.
+Even then, "valid" makes a narrow promise: the credential passes this pool's checks at the state and time the page read. A borrow can still fail for reasons outside the credential: the amount is over the tier's limit, there's already a loan in this pool, the vault is short, a token account is frozen, or the state changes before the transaction runs. The funders' loan book, a page that lists every open loan, runs the same function for every borrower, so "fresh" there makes the same narrow promise.
 
 Choosing which checks to run is a product decision too. Repay first sat behind the same "is your tier valid?" gate as Borrow, which locked a borrower with a stale tier out of repaying, and repaying needs no tier at all. Repay now has no tier check in front of it.
 
@@ -125,7 +130,7 @@ None of this makes the page trustless:
 
 - **It reads one RPC node.** It checks what's cheap to check: reply lengths, account sizes and types, which wallet a record belongs to, and signatures over bytes it built. A node that invented consistent data could still fool it.
 - **"Confirmed" also comes from that node.** The signature check proves the id belongs to the bytes the page built; the node still reports whether they landed.
-- **The gateway names the relayer.** The relayer's key comes from the gateway's own info endpoint. The signature check ties the returned id to the bytes the page built; it doesn't prove who paid the fee.
+- **The gateway names the relayer.** The relayer's key comes from the gateway's own info endpoint, and the page writes it into the transaction as the fee payer. The check proves the id belongs to the bytes the page built. It doesn't prove the fee-payer key the gateway named is really my relayer's.
 - **I serve the page.** A different build could skip every check. That's why the source is public at release tags, and why the receipt checks also run from a [command line](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.5/verifier/README.md).
 
 What the checks do buy: my gateway is no longer the only authority for a tier, a loan or a registration. The page checks each of those claims against what an RPC node returns, and most gateway bugs now show up as an error on screen instead of a wrong number. The limits above still apply: a stale read, or a reused identical transaction, can get past these checks.
