@@ -1,6 +1,6 @@
 # prashantchaudhari.dev
 
-Source for [prashantchaudhari.dev](https://prashantchaudhari.dev), my personal site and blog. I write about taking problems from idea to working solution: the research, the tradeoffs, and the code.
+Source for [prashantchaudhari.dev](https://prashantchaudhari.dev), my personal site and blog. I'm a software engineer researching how money moves, building on Solana, and writing down the thinking from idea to working code.
 
 Built with [Astro](https://astro.build) on the [AstroPaper](https://github.com/satnaing/astro-paper) theme, deployed on [Netlify](https://www.netlify.com).
 

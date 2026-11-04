@@ -3,7 +3,7 @@ export const SITE = {
   author: "Prashant Chaudhari",
   profile: "https://prashantchaudhari.dev/",
   githubUsername: "pandaa880",
-  desc: "Software engineer. I take problems from idea to working solution, researching while I build, and write up the thinking: what I read, what I tried, and what changed my mind.",
+  desc: "Software engineer. Researching how money moves, building on Solana, and writing down the thinking from idea to working code.",
   title: "Prashant Chaudhari",
   ogImage: undefined,
   lightAndDarkMode: true,
