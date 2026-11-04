@@ -3,7 +3,7 @@ export const SITE = {
   author: "Prashant Chaudhari",
   profile: "https://prashantchaudhari.dev/",
   githubUsername: "pandaa880",
-  desc: "Senior frontend engineer, seven years in: four on consumer credit products, now building verifiable credit on Solana. Notes on fintech UIs that show their work.",
+  desc: "Software engineer. Researching how money moves, building on Solana, and writing down the thinking from idea to working code.",
   title: "Prashant Chaudhari",
   ogImage: undefined,
   lightAndDarkMode: true,

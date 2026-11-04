@@ -1,15 +1,13 @@
 ---
 layout: ../layouts/AboutLayout.astro
 title: "About"
-description: "Senior frontend engineer with seven years of experience, four on consumer credit at Deserve and Intuit. Now building verifiable credit on Solana."
+description: "Software engineer. Researching how money moves, building on Solana, and writing down the thinking from idea to working code."
 ---
 
-I'm Prashant, a senior frontend engineer with seven years of experience, the last four building consumer credit products.
+I'm Prashant, a software engineer. I'm researching how money moves and building on Solana. My latest project, [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle), turns a bank statement into a per-loan receipt a lender can verify without seeing the statement.
 
-I worked on credit products at Deserve, then at Intuit.
+**How I work:** I start from the problem, not the stack. I research and build side by side: read what's already out there, run small experiments to check my assumptions, then pick an approach and take it to something that works.
 
-Since then I've been building on Solana. My latest project, [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle), turns a bank statement into a per-loan receipt a lender can verify without seeing the statement.
+**What I write about here:** that process, written down. Each post follows one problem from idea to solution: the research, the options I weighed, what I built, and where the obvious approach would have been wrong. Lately that means how money moves: verifiable credit on Solana and handling money correctly in code. Also frontend craft: design systems, accessibility, tests that catch something.
 
-**What I write about here:** frontends that verify instead of trusting; fintech engineering (money, credit, the product decisions behind them); and frontend craft: design systems, accessibility, tests that catch something.
-
-**Open to** remote senior frontend and full-stack roles with Solana and fintech teams. I'm based in Bangalore. The best way to reach me is a DM on X: [@pandaa880](https://x.com/pandaa880).
+**Open to** remote software engineering roles, full-time or contract. I'm based in Bangalore. The best way to reach me is a DM on X: [@pandaa880](https://x.com/pandaa880).

@@ -30,7 +30,7 @@ export const getPersonSchema = (imageURL?: string) => ({
   "@id": PERSON_ID,
   name: SITE.author,
   url: SITE.website,
-  jobTitle: "Senior Frontend Engineer",
+  jobTitle: "Software Engineer",
   ...(imageURL && { image: imageURL }),
   sameAs,
 });
