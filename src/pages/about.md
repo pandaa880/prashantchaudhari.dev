@@ -1,12 +1,12 @@
 ---
 layout: ../layouts/AboutLayout.astro
 title: "About"
-description: "Senior software engineer, seven years in. I take problems from idea to working solution, researching while I build, and write up the thinking along the way."
+description: "Software engineer. I take problems from idea to working solution, researching while I build, and write up the thinking along the way."
 ---
 
-I'm Prashant, a senior software engineer with seven years of experience, the last four building consumer credit products.
+I'm Prashant, a software engineer.
 
-I worked on credit products at Deserve, then at Intuit.
+I worked at Deserve, then at Intuit.
 
 Since then I've been building on Solana. My latest project, [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle), turns a bank statement into a per-loan receipt a lender can verify without seeing the statement.
 
