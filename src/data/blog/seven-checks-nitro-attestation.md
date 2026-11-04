@@ -1,14 +1,14 @@
 ---
 title: "Seven checks: verifying an AWS Nitro attestation in the browser"
 description: "My server says an enclave scored this borrower. The verify page checks that claim itself, against AWS's signature and Solana, without trusting my server. Seven checks, and where the obvious code would have been wrong."
-pubDatetime: 2026-11-07T15:30:00+05:30
+pubDatetime: 2026-11-04T15:30:00+05:30
 tags:
   - aws-nitro
   - attestation
   - typescript
   - cryptography
   - solana
-draft: true
+draft: false
 ---
 
 I'm building [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle). It reads a borrower's bank statement inside a sealed-off part of an AWS server, works out a credit tier (A, B or C), signs it, and writes it to Solana devnet. A lending pool reads the tier there before it lends.
