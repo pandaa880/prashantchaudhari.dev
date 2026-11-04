@@ -10,4 +10,4 @@ I'm Prashant, a software engineer. I'm researching how money moves and building 
 
 **What I write about here:** that process, written down. Each post follows one problem from idea to solution: the research, the options I weighed, what I built, and where the obvious approach would have been wrong. Lately that means how money moves: verifiable credit on Solana and handling money correctly in code. Also frontend craft: design systems, accessibility, tests that catch something.
 
-**Open to** remote software engineering roles. I'm based in Bangalore. The best way to reach me is a DM on X: [@pandaa880](https://x.com/pandaa880).
+**Open to** remote software engineering roles, full-time or contract. I'm based in Bangalore. The best way to reach me is a DM on X: [@pandaa880](https://x.com/pandaa880).
