@@ -4,11 +4,7 @@ title: "About"
 description: "Software engineer. I take problems from idea to working solution, researching while I build, and write up the thinking along the way."
 ---
 
-I'm Prashant, a software engineer.
-
-I worked at Deserve, then at Intuit.
-
-Since then I've been building on Solana. My latest project, [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle), turns a bank statement into a per-loan receipt a lender can verify without seeing the statement.
+I'm Prashant, a software engineer. Lately I've been researching and building on Solana. My latest project, [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle), turns a bank statement into a per-loan receipt a lender can verify without seeing the statement.
 
 **How I work:** I start from the problem, not the stack. I research and build side by side: read what's already out there, run small experiments to check my assumptions, then pick an approach and take it to something that works.
 
