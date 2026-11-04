@@ -1,10 +1,10 @@
 ---
 layout: ../layouts/AboutLayout.astro
 title: "About"
-description: "Senior frontend engineer, seven years in. I take problems from idea to working solution, researching while I build, and write up the thinking along the way."
+description: "Senior software engineer, seven years in. I take problems from idea to working solution, researching while I build, and write up the thinking along the way."
 ---
 
-I'm Prashant, a senior frontend engineer with seven years of experience, the last four building consumer credit products.
+I'm Prashant, a senior software engineer with seven years of experience, the last four building consumer credit products.
 
 I worked on credit products at Deserve, then at Intuit.
 
