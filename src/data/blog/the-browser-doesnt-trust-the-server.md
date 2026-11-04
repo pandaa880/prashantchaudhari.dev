@@ -16,7 +16,7 @@ That sounds like paranoia about my own code, so here's the context. I'm building
 
 The whole product claims that a lender doesn't have to trust me. If the page repeats whatever my gateway says, that claim stops at the page. So the page treats the gateway as a messenger: it can carry bytes, but it never becomes the source of anything the page calls verified.
 
-This post is for frontend developers building on Solana. You know transactions, signatures and RPC calls; you don't need to know anything about enclaves. It walks through five places the page checks its own backend, each as the shortcut, what can go wrong with it, and what the page does instead. The page still trusts three things: the RPC node it reads from, the relayer key my gateway names, and the code I serve it. I'll come back to all three at the end. Every link points to release [v0.5.5](https://github.com/pandaa880/tee-income-oracle/tree/v0.5.5/web/src).
+This post is for frontend developers building on Solana. You know transactions, signatures and RPC calls; you don't need to know anything about enclaves. It walks through five places the page checks its own backend, each as the shortcut, what can go wrong with it, and what the page does instead. The page still trusts two things, the RPC node it reads from and the code I serve it, and I'll come back to both at the end. Every link points to release [v0.5.5](https://github.com/pandaa880/tee-income-oracle/tree/v0.5.5/web/src).
 
 ## Table of contents
 
@@ -38,7 +38,7 @@ The policy hash identifies the scoring rules the enclave will apply; each pool s
 
 **What can go wrong:** the gateway now holds the pen. Whatever it puts in that text gets signed: a different wallet, an expiry next year, a policy no pool lends under. In the demo the wallet lives in the browser tab and signs without a prompt, so nobody reads the text first.
 
-**What the page does:** it writes the text itself and compares it with the gateway's copy. It signs only when the two are identical. The comparison matters because the enclave rebuilds the same text and checks the signature against its own copy, so the page has to sign exactly what the enclave will check. The wallet line comes from the page alone. The other values come from the gateway, so the page can only hold them to rules: the session id must match the session the page will submit under, the policy must be one a listed pool lends under, and the expiry must fall within the next ten minutes (plus a minute for clock skew). A gateway can still choose the session and the policy within those rules. It can't get a signature for anything else. ([`intent.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.5/web/src/domain/intent.ts))
+**What the page does:** it writes the text itself and compares it with the gateway's copy. It signs only when the two are identical. The comparison is the defense. The enclave wrote that text from the wallet and policy my gateway asked for, and it checks the signature against that text, so its copy is only as honest as the gateway's request. The wallet line comes from the page alone. The other values come from the gateway, so the page can only hold them to rules: the session id must match the session the page will submit under, the policy must be one a listed pool lends under, and the expiry must fall within the next ten minutes (plus a minute for clock skew). A gateway can still choose the session and the policy within those rules. It can't get a signature for anything else. ([`intent.ts`](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.5/web/src/domain/intent.ts))
 
 This isn't a quirk of my setup. [`@solana/kit`](https://github.com/anza-xyz/kit), Solana's JavaScript library (formerly released as web3.js 2.0), makes the same argument from the other side in its documentation for [signing off-chain messages](https://github.com/anza-xyz/kit/blob/d50fc28223a537e8cc66c137e818cc79ed52b5d7/packages/offchain-messages/README.md): a valid signature from a wallet proves little until you've also confirmed it covers the message you meant to have signed.
 
@@ -71,8 +71,8 @@ That still isn't complete replay protection. Ed25519 signatures are deterministi
 
 1. The borrower borrows, and it confirms.
 2. The borrower repays. The page refuses to borrow while a loan is open, so a repay has to come first.
-3. Within about a minute, while the blockhash is still valid, the borrower borrows the same amount again. Asking for the latest blockhash doesn't guarantee a new one, so the bytes can be identical.
-4. The relayer answers with the first borrow's id, which did confirm. The page reads the loan account after confirmation, but that read has no lower bound on freshness, so a node still showing the first loan lets it through.
+3. Within about a minute, while the blockhash is still valid, the borrower borrows the same amount again, and the RPC node hands back the same blockhash. Blockhashes change every slot, so this takes a node that is lagging or lying, but it's the node the page asks.
+4. The bytes are identical, so the id is too. Validators drop the second transaction as already processed, yet its id shows as confirmed because the first borrow confirmed. The relayer doesn't have to lie for this. The page reads the loan account after confirmation, but that read has no lower bound on freshness, so a node still showing the first loan lets it through.
 
 ## 3. Show what the chain says, not what the server says
 
@@ -130,7 +130,6 @@ None of this makes the page trustless:
 
 - **It reads one RPC node.** It checks what's cheap to check: reply lengths, account sizes and types, which wallet a record belongs to, and signatures over bytes it built. A node that invented consistent data could still fool it.
 - **"Confirmed" also comes from that node.** The signature check proves the id belongs to the bytes the page built; the node still reports whether they landed.
-- **The gateway names the relayer.** The relayer's key comes from the gateway's own info endpoint, and the page writes it into the transaction as the fee payer. The check proves the id belongs to the bytes the page built. It doesn't prove the fee-payer key the gateway named is really my relayer's.
 - **I serve the page.** A different build could skip every check. That's why the source is public at release tags, and why the receipt checks also run from a [command line](https://github.com/pandaa880/tee-income-oracle/blob/v0.5.5/verifier/README.md).
 
 What the checks do buy: my gateway is no longer the only authority for a tier, a loan or a registration. The page checks each of those claims against what an RPC node returns, and most gateway bugs now show up as an error on screen instead of a wrong number. The limits above still apply: a stale read, or a reused identical transaction, can get past these checks.
