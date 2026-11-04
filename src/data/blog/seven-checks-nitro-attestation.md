@@ -112,7 +112,7 @@ const leaf = verifyChain({
 });
 ```
 
-That gives something up: the check no longer shows the document is recent. So that has to come from Solana instead. The document's hash was stored in the registry when the build was registered, right after a live check (check 6), and the entry must still be active (check 7). When the enclave restarts, it creates a new key, so the old build's entry is retired, and tiers it signed stop passing.
+That gives something up: the check no longer shows the document is recent. So that has to come from Solana instead. The document's hash was stored in the registry when the build was registered, right after a live check (check 6), and the entry must still be active (check 7). When the enclave restarts, it creates a new key and gets a new entry. By default, my rotation script then retires the old entry, and tiers it signed stop passing. The one exception is a deliberate choice: when the old machine is gone, its key went with it and nobody can sign with it again, so I can keep its entry active. That's why the example wallet on the verify page still passes.
 
 ## 4. A code fingerprint that changes when you edit a comment
 
