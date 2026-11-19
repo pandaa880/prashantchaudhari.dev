@@ -1,5 +1,5 @@
 ---
-title: "Don't pass the signed bytes twice: verifying an enclave's signature in a Solana program"
+title: "Five checks before a Solana program trusts a signature it didn't verify"
 description: "The Solana program never verifies the enclave's signature; a precompile does, one instruction earlier. Five checks that make sure the program reads the bytes that were actually verified, and the attack each one stops."
 pubDatetime: 2026-11-20T16:00:00+05:30
 tags:
