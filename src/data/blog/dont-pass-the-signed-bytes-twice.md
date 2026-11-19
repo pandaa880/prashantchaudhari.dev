@@ -11,6 +11,8 @@ tags:
 draft: false
 ---
 
+> **TL;DR:** On Solana, a program can let a built-in verifier check a signature in the instruction just before its own, then read what that verifier was given. If the program reads the wrong bytes, a forged approval gets through: that's how an attacker minted over $320 million of unbacked tokens from the Wormhole bridge in 2022. This post covers the five checks the TEE Income Oracle program makes so it reads only the bytes that were actually verified, and the attack each one stops.
+
 [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle) reads a borrower's bank statement inside an AWS Nitro enclave and signs a credit tier for their wallet. A Solana program then writes that tier to the [Solana Attestation Service](https://github.com/solana-foundation/solana-attestation-service) (SAS), where a lending pool reads it before it lends.
 
 The program has one job: write the tier only if the enclave really signed it. Here is the odd part. The program never verifies that signature. Solana does, in a separate instruction just before it. The program only reads what that instruction was given, and trusts it because the transaction would have failed otherwise.
