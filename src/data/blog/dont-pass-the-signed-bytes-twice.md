@@ -54,9 +54,9 @@ There is no second copy that could disagree. That's the whole idea: **read the s
 
 The instructions sysvar is just an account, and the caller passes it in. If the program reads whatever account it is handed, an attacker can pass a fake account that _looks_ like an instruction list with a verified signature in it.
 
-That isn't hypothetical. In February 2022 the Wormhole bridge on Solana lost about 120,000 wrapped ETH (over $320 million at the time) this way: its signature check loaded instructions from an account it never confirmed was the real sysvar ([Halborn's write-up](https://www.halborn.com/blog/post/explained-the-wormhole-hack-february-2022), [CertiK's analysis](https://www.certik.com/resources/blog/wormhole-bridge-exploit-incident-analysis)).
+That isn't hypothetical. In February 2022 an attacker minted about 120,000 unbacked wrapped ETH (over $320 million at the time) from the Wormhole bridge on Solana this way. Its signature check never confirmed that the account it was handed was the real instructions sysvar, so a fake one let the attacker forge a guardian message ([Wormhole's incident report](https://wormholecrypto.medium.com/wormhole-incident-report-02-02-22-ad9b8f21eec6), [Halborn's write-up](https://www.halborn.com/blog/post/explained-the-wormhole-hack-february-2022)).
 
-Anchor validates typed sysvars like `Sysvar<'info, Clock>` for you. The instructions sysvar has no typed Anchor wrapper, so it usually arrives as an `UncheckedAccount`, and pinning its address is on you. (Wormhole used the old `load_instruction_at`, which never checked it.) The fix is one constraint on the account, plus the `_checked` loaders, which check the sysvar address again:
+Anchor validates typed sysvars like `Sysvar<'info, Clock>` for you. The instructions sysvar has no typed Anchor wrapper, so it usually arrives as an `UncheckedAccount`, and pinning its address is on you. (Wormhole's code used older, now-deprecated loader functions that didn't check it.) The fix is one constraint on the account, plus the `_checked` loaders, which check the sysvar address again:
 
 ```rust
 /// CHECK: pinned to the instructions sysvar, so introspection can't read
