@@ -11,7 +11,7 @@ tags:
 draft: false
 ---
 
-> **TL;DR:** On Solana, a program can let a built-in verifier check a signature in the instruction just before its own, then read what that verifier was given. If the program reads the wrong bytes, a forged approval gets through: that's how an attacker minted over $320 million of unbacked tokens from the Wormhole bridge in 2022. This post covers the five checks the TEE Income Oracle program makes so it reads only the bytes that were actually verified, and the attack each one stops.
+> **TL;DR:** On Solana, a program can let a built-in verifier check a signature in the instruction just before its own, then read what that verifier was given. If the program reads the wrong bytes, a forged approval gets through: that's how an attacker minted over $320 million of unbacked tokens from the Wormhole bridge in 2022. This post covers the five checks the TEE Income Oracle program runs so that it reads only the bytes that were actually verified, and the attack each one stops.
 
 [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle) reads a borrower's bank statement inside an AWS Nitro enclave and signs a credit tier for their wallet. A Solana program then writes that tier to the [Solana Attestation Service](https://github.com/solana-foundation/solana-attestation-service) (SAS), where a lending pool reads it before it lends.
 
@@ -21,7 +21,7 @@ That hand-off is where it can go wrong. This post covers the five checks I ended
 
 ## How a Solana program checks a signature it never sees
 
-The enclave's key is secp256k1: the enclave platform I run on ([Marlin Oyster](https://www.marlin.org/oyster)) gives each enclave one when it boots. Solana has a built-in verifier for secp256k1 signatures, a **precompile**. It runs as native code inside the runtime, not inside the program, and only as its own instruction in the transaction: a program [can't call it through a CPI](https://github.com/anza-xyz/agave/blob/v4.4.1/program-runtime/src/cpi.rs#L234-L236). So the transaction carries these two instructions, one right after the other (the real one also starts with a compute-budget instruction):
+The enclave signs with a secp256k1 key: the enclave platform I run on ([Marlin Oyster](https://www.marlin.org/oyster)) gives each enclave one when it boots. Solana has a built-in verifier for secp256k1 signatures, a **precompile**. It runs as native code inside the runtime, not inside the program, and only as its own instruction in the transaction: a program [can't call it through a CPI](https://github.com/anza-xyz/agave/blob/v4.4.1/program-runtime/src/cpi.rs#L234-L236). So the transaction carries these two instructions, one right after the other (the real one also starts with a compute-budget instruction):
 
 | #   | Instruction          | What it does                                                                    |
 | --- | -------------------- | ------------------------------------------------------------------------------- |
@@ -69,13 +69,13 @@ The secp256k1 precompile doesn't have to verify the bytes in its own instruction
 
 The ed25519 precompile has a special value, `u16::MAX`, that means "this instruction". secp256k1 has nothing like it. So any index can point at a _different_ instruction, and the precompile will verify bytes from there.
 
-Here is the attack that allows. Two parties read the precompile's bytes: the runtime follows the index fields, and the program reads fixed offsets. If they point at different bytes, the attacker controls the gap. The tests build exactly this transaction:
+Here is the attack this allows. Two parties read the precompile's bytes: the runtime follows the index fields, and the program reads fixed offsets. If they point at different bytes, the attacker controls the gap. The tests build exactly this transaction:
 
 | #   | Instruction                 | Contents                                                                                                                                                                                                             |
 | --- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0   | Decoy secp256k1 precompile  | The attacker's own message, signed with the attacker's own key. Valid.                                                                                                                                               |
 | 1   | "Real" secp256k1 precompile | Its own data holds, at the usual offsets, the **enclave's** address and a **forged** message giving the attacker tier A. But all three index fields say `0`, so the precompile checks instruction 0's bytes instead. |
-| 2   | `submit_attestation`        | The program                                                                                                                                                                                                          |
+| 2   | `submit_attestation`        | Reads instruction 1 at the usual offsets and trusts what it finds.                                                                                                                                                   |
 
 When the runtime checks instruction 1, it follows instruction 1's indexes to instruction 0 and verifies the attacker's signature over the attacker's message. That's valid, so instruction 1 passes. The program, reading instruction 1 at the usual offsets, sees the enclave's address and a tier-A message, and writes a tier the enclave never signed.
 
@@ -145,7 +145,7 @@ fn load_precompile(instructions_sysvar: &AccountInfo) -> Result<(u8, Vec<u8>)> {
 }
 ```
 
-With a scan, one verified signature could back two `submit_attestation` instructions in the same transaction. It also checks the program id, so an impostor program can't sit in that slot.
+With a scan, one verified signature could back two `submit_attestation` instructions in the same transaction. `load_precompile` also checks the program id, so an impostor program can't sit in that slot.
 
 One subtlety: if a wrapper program calls `submit_attestation` through a CPI, "the instruction that's running" is the wrapper's, because the sysvar only lists top-level instructions. So the precompile has to sit right before the wrapper. A wrapper that calls twice is covered in check 5.
 
@@ -215,6 +215,6 @@ The five checks, split into steps:
 4. Require a signature count of exactly 1 (a bare `[0]` passes the runtime), and compare the whole offsets block with the one a self-pointing precompile must have. With ed25519, require `u16::MAX` or the precompile's own index.
 5. Fix the precompile's position (current − 1, where current is the top-level instruction); don't scan.
 6. Decide what makes a signature _fresh_ (a strictly increasing time or nonce per subject). Validity isn't enough, and the signature bytes aren't a safe id.
-7. Write a test with a decoy instruction. A test without a decoy passes whether or not check 3 is there.
+7. Write a test with a decoy instruction. A test without a decoy passes whether or not the program checks that the precompile points at itself.
 
-The code is in [`programs/oracle/src/attest.rs`](https://github.com/pandaa880/tee-income-oracle/blob/main/programs/oracle/src/attest.rs) and [`submit_attestation.rs`](https://github.com/pandaa880/tee-income-oracle/blob/main/programs/oracle/src/instructions/submit_attestation.rs). The snippets above rename a few variables for reading; the logic is the same. In [the previous post](/posts/seven-checks-nitro-attestation/) I covered the other end: checking, in the browser, that the key behind these signatures really lives in the enclave.
+The code is in [`programs/oracle/src/attest.rs`](https://github.com/pandaa880/tee-income-oracle/blob/main/programs/oracle/src/attest.rs) and [`submit_attestation.rs`](https://github.com/pandaa880/tee-income-oracle/blob/main/programs/oracle/src/instructions/submit_attestation.rs). The snippets above rename a few variables for readability; the logic is the same. In [the previous post](/posts/seven-checks-nitro-attestation/) I covered the other end: checking, in the browser, that the key behind these signatures really lives in the enclave.
