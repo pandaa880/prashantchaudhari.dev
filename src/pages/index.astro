@@ -24,13 +24,37 @@ const recentPosts = sortedPosts.filter(({ data }) => !data.featured);
 
 const structuredData = getHomeSchema(await getProfileImageURL());
 
-const PROJECT_LINKS = [
-  { label: "Live demo", href: "https://tee-income-oracle-web.vercel.app" },
+type Project = {
+  name: string;
+  oneLiner: string;
+  context: string;
+  body: string;
+  stats: string;
+  status: string;
+  links: { label: string; href: string }[];
+};
+
+// Claim only what shipped. Add a project once its repo is public.
+const PROJECTS: Project[] = [
   {
-    label: "Verify a receipt",
-    href: "https://tee-income-oracle-web.vercel.app/verify",
+    name: "TEE Income Oracle",
+    oneLiner: "Proof-of-reserves for loan books.",
+    context: "Colosseum World's Fair hackathon · built solo, 2026",
+    body: "A funder buying a pool of loans gets a bank-side check for each one. The borrower's statement (India's Account Aggregator format, sandbox data in the demo) is read inside an AWS Nitro enclave and never leaves it. Solana stores only the result, and anyone can verify it in their browser.",
+    stats: "19 days from first commit to the judged release · 1,100+ web tests",
+    status:
+      "Hosted demo offline from 22 Nov 2026 · receipts still verify in the browser",
+    links: [
+      {
+        label: "Verify a receipt",
+        href: "https://tee-income-oracle-web.vercel.app/verify",
+      },
+      {
+        label: "Source",
+        href: "https://github.com/pandaa880/tee-income-oracle",
+      },
+    ],
   },
-  { label: "Source", href: "https://github.com/pandaa880/tee-income-oracle" },
 ];
 ---
 
@@ -110,7 +134,7 @@ const PROJECT_LINKS = [
     </section>
 
     <section
-      id="featured-project"
+      id="projects"
       class:list={[
         "pt-12 pb-6",
         {
@@ -119,41 +143,36 @@ const PROJECT_LINKS = [
         },
       ]}
     >
-      <h2 class="text-2xl font-semibold tracking-wide">Featured project</h2>
-      <div class="my-6">
-        <h3 class="text-lg font-medium">TEE Income Oracle</h3>
-        <p class="text-sm opacity-80">
-          Colosseum World's Fair hackathon · built solo, 2026
-        </p>
-        <p class="mt-2">
-          A per-loan receipt for credit funders. A borrower's bank statement, in
-          India's Account Aggregator format (sandbox data in the demo), is
-          checked inside an AWS Nitro enclave and never leaves it. Solana gets
-          the tier, the policy hash and the statement's date range; a lending
-          pool reads it inside its own instruction, and anyone can verify the
-          receipt in their browser.
-        </p>
-        <p class="mt-2 text-sm opacity-80">
-          19 days from first commit to the judged release · 1,100+ web tests ·
-          live on devnet
-        </p>
-        <ul class="mt-3 flex flex-wrap gap-x-4 gap-y-1">
-          {
-            PROJECT_LINKS.map(({ label, href }) => (
-              <li>
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-accent decoration-dashed underline-offset-4 hover:underline"
-                >
-                  {label}
-                </a>
-              </li>
-            ))
-          }
-        </ul>
-      </div>
+      <h2 class="text-2xl font-semibold tracking-wide">Projects</h2>
+      <ul>
+        {
+          PROJECTS.map(project => (
+            <li class="my-6">
+              <h3 class="text-lg font-medium">
+                {project.name}: {project.oneLiner}
+              </h3>
+              <p class="text-sm opacity-80">{project.context}</p>
+              <p class="mt-2">{project.body}</p>
+              <p class="mt-2 text-sm opacity-80">{project.stats}</p>
+              <p class="text-sm opacity-80">{project.status}</p>
+              <ul class="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+                {project.links.map(({ label, href }) => (
+                  <li>
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-accent decoration-dashed underline-offset-4 hover:underline"
+                    >
+                      {label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))
+        }
+      </ul>
     </section>
 
     {
