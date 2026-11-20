@@ -17,13 +17,7 @@ draft: false
 
 The program has one job: write the tier only if the enclave really signed it. Here is the odd part. The program never verifies that signature. Solana does, in a separate instruction just before it. The program only reads what that instruction was given, and trusts it because the transaction would have failed otherwise.
 
-That hand-off is where it can go wrong. This post covers the five checks I ended up with, and the attack each one stops. It assumes you've written an Anchor program; the next section is a quick refresher on the two terms it leans on most.
-
-## Two terms first: PDAs and CPIs
-
-A **program-derived address (PDA)** is an address a program computes from its own program id plus some seeds: any bytes, like `"sas_signer"`. It is chosen to lie off the ed25519 curve, so no private key exists for it. Nobody can sign for a PDA with a key; only the program it was derived from can, and only while that program runs. Landing off the curve can take a few tries: `find_program_address` adds a "bump" byte, starting at 255 and counting down, until one works. ([Solana docs: PDAs](https://solana.com/docs/core/pda))
-
-A **cross-program invocation (CPI)** is one program calling another program's instruction while it runs, much like a function call. If the caller passes a PDA's seeds along (`invoke_signed`), the runtime treats that PDA as a signer of the call. That's how the program writes to SAS: it calls SAS through a CPI, signing as its `["sas_signer"]` PDA. ([Solana docs: CPIs](https://solana.com/docs/core/cpi))
+That hand-off is where it can go wrong. This post covers the five checks I ended up with, and the attack each one stops. It assumes you've written an Anchor program and know what PDAs and CPIs are.
 
 ## How a Solana program checks a signature it never sees
 
@@ -40,15 +34,15 @@ So the real question isn't "is the signature valid?" Solana answers that. The qu
 
 ## Why not verify inside the program?
 
-You can. Solana has a `secp256k1_recover` syscall: hash the message, recover the public key, turn it into an address, compare. One instruction, no hand-off. It costs [25,000 compute units](https://github.com/anza-xyz/agave/blob/v4.4.1/program-runtime/src/execution_budget.rs#L224) on its own, though. On devnet, a whole transaction that creates a tier costs 22,143 compute units at the median: 19,143 to 34,143 across the 21 transactions since the last program upgrade. The spread comes from deriving the attestation's address, which takes more tries for some wallets. (The usual fix, storing the canonical bump, isn't open here: the account belongs to SAS and has no bump field, and taking the bump as an argument would bring back a second copy of input, the thing check 1 below avoids.) So the syscall alone would cost more than a typical create. It also leaves the keccak hashing and the address derivation to me.
+You can. Solana has a `secp256k1_recover` syscall: hash the message, recover the public key, turn it into an address, compare. One instruction, no hand-off. It costs [25,000 compute units](https://github.com/anza-xyz/agave/blob/v4.4.1/program-runtime/src/execution_budget.rs#L224) on its own, though. On devnet, a whole transaction that creates a tier costs 22,143 compute units at the median: 19,143 to 34,143 across the 21 transactions since the last program upgrade. The spread comes from deriving the attestation's address, which takes more tries for some wallets. (Half of that spread is SAS deriving the same address again when it creates the account, so taking the bump from the caller would save at most the other half.) So the syscall alone would cost more than a typical create. It also leaves the keccak hashing and the address derivation to me.
 
-The precompile does the cryptography in native code that the runtime maintains, so I took it. It isn't free: each signature it verifies is [charged like a transaction signature](https://github.com/anza-xyz/agave/blob/v4.4.1/fee/src/lib.rs#L42-L56), 5,000 lamports. But it doesn't spend compute units. The price is the hand-off: the program has to prove that what the precompile verified is what it's about to write. Checks 2 to 4 below are that price.
+The precompile does the cryptography in native code that the runtime maintains, so I took it. It isn't free: each signature it verifies is [charged like a transaction signature](https://github.com/anza-xyz/agave/blob/v4.4.1/fee/src/lib.rs#L42-L56), 5,000 lamports. But it doesn't draw from the transaction's compute budget. The price is the hand-off: the program has to prove that what the precompile verified is what it's about to write. Checks 2 to 4 below are that price.
 
 ## Check 1: pass the signed bytes once
 
 A common shape for this is to pass the message as an instruction argument, then compare it with the precompile's data. That's two copies of the same bytes, and the comparison is code that can be wrong: one field compared, one forgotten, a length off by one.
 
-`submit_attestation` takes no arguments at all. The enclave signs a fixed 232-byte message: a domain tag, then this program's id, the SAS credential, the schema, the borrower's wallet, the 83-byte tier payload, and an expiry. The program reads every one of those from inside the precompile instruction, where they were verified. Then it checks the accounts against the message: the credential and schema accounts must be the ones it names, and the attestation account must be the SAS address derived from that credential, schema and wallet.
+`submit_attestation` takes no arguments at all. The enclave signs a fixed 232-byte message: a domain tag, then this program's id, the SAS credential, the schema, the borrower's wallet, the 83-byte tier payload (which carries `issued_at`, the time the enclave signed), and an expiry. The program reads every one of those from inside the precompile instruction, where they were verified. Then it checks the accounts against the message: the credential and schema accounts must be the ones it names, and the attestation account must be the SAS address derived from that credential, schema and wallet.
 
 There is no second copy that could disagree. That's the whole idea: **read the signed bytes where they were verified, not from somewhere else.**
 
@@ -81,7 +75,7 @@ Here is the attack that allows. Two parties read the precompile's bytes: the run
 | --- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0   | Decoy secp256k1 precompile  | The attacker's own message, signed with the attacker's own key. Valid.                                                                                                                                               |
 | 1   | "Real" secp256k1 precompile | Its own data holds, at the usual offsets, the **enclave's** address and a **forged** message giving the attacker tier A. But all three index fields say `0`, so the precompile checks instruction 0's bytes instead. |
-| 2   | `submit_attestation`        |                                                                                                                                                                                                                      |
+| 2   | `submit_attestation`        | The program                                                                                                                                                                                                          |
 
 When the runtime checks instruction 1, it follows instruction 1's indexes to instruction 0 and verifies the attacker's signature over the attacker's message. That's valid, so instruction 1 passes. The program, reading instruction 1 at the usual offsets, sees the enclave's address and a tier-A message, and writes a tier the enclave never signed.
 
@@ -153,7 +147,7 @@ fn load_precompile(instructions_sysvar: &AccountInfo) -> Result<(u8, Vec<u8>)> {
 
 With a scan, one verified signature could back two `submit_attestation` instructions in the same transaction. It also checks the program id, so an impostor program can't sit in that slot.
 
-One subtlety: if a wrapper program calls `submit_attestation` through a CPI, "the instruction that's running" is the wrapper's, because the sysvar only lists top-level instructions. So the precompile has to sit right before the wrapper. The doc comment above says what should happen to a wrapper that calls twice; check 5 explains why, and that it isn't tested yet.
+One subtlety: if a wrapper program calls `submit_attestation` through a CPI, "the instruction that's running" is the wrapper's, because the sysvar only lists top-level instructions. So the precompile has to sit right before the wrapper. A wrapper that calls twice is covered in check 5.
 
 ## Check 5: a valid signature isn't a fresh one
 
@@ -161,7 +155,7 @@ After checks 1 to 4, the program knows the enclave signed these exact bytes. It 
 
 **Replay through refresh.** A borrower's tier can be refreshed: close the old attestation, write the new one. The first design had a hole there. An older signature that hadn't expired yet could close a _newer_ attestation and write the older tier back. Refresh is a write path, and it needs the same suspicion as create.
 
-The rule that closes it: for each wallet, the new `issued_at` must be strictly later than the stored one.
+The rule that closes it: for each wallet, the new `issued_at` must be strictly later than the stored one. That only works if the stored attestation can't disappear, because an empty slot has nothing to compare against. Here it can't: SAS lets only the credential's authorized signer close an attestation, that signer is the program itself (more on that below), and the program only closes one inside a refresh that writes a newer tier.
 
 ```rust
 /// Closes the wallet's existing attestation if there is one, after checking
@@ -197,7 +191,7 @@ That one rule also stops an exact replay of the same signature. By the same reas
 
 ## The signer with no private key
 
-All five checks would be useless if anyone could write to SAS directly. So the SAS credential has exactly one authorized signer: a program-derived address, `["sas_signer"]`, derived from the program's id. No one holds a key for it; only the program's code can sign as it, and only after these checks pass.
+All five checks would be useless if anyone could write to SAS directly. So the SAS credential has exactly one authorized signer: a [program-derived address](https://solana.com/docs/core/pda) (PDA), derived from the program's id and the seed `"sas_signer"`. A PDA lies off the ed25519 curve, so no private key exists for it. Only the program's code can sign as it, by passing the seeds along when it calls SAS (`invoke_signed`), and it does that only after these checks pass.
 
 That doesn't make the trust disappear; it moves it to three keys. The credential's authority could add another signer. The program's upgrade authority could change the code. And the registry's admin decides which enclave keys count, so a bad registration would pass every check above. It's also why a lending program must check that a stored attestation's signer is this PDA, as the demo pool does.
 
