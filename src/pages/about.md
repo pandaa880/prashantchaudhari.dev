@@ -4,7 +4,7 @@ title: "About"
 description: "Software engineer. Researching how money moves, building on Solana, and writing down the thinking from idea to working code."
 ---
 
-I'm Prashant, a software engineer. I'm researching how money moves and building on Solana. My latest project, [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle), turns a bank statement into a per-loan receipt a lender can verify without seeing the statement.
+I'm Prashant, a software engineer. I'm researching how money moves and building on Solana. My latest project, [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle), is proof-of-reserves for loan books: a funder buying a pool of loans gets a bank-side check for each one, verifiable without seeing the borrower's statement.
 
 **How I work:** I start from the problem, not the stack. I research and build side by side: read what's already out there, run small experiments to check my assumptions, then pick an approach and take it to something that works.
 
