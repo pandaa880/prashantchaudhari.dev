@@ -11,14 +11,13 @@ tags:
 draft: true
 ---
 
-> **TL;DR:** TIO scores a bank statement inside an AWS Nitro enclave, so no one, including me, reads it. It signs a risk tier, and a Solana program stores it. Anyone can check which code ran. The system is only as honest as four things you still trust: AWS Nitro and the enclave code, the Account Aggregator, one admin key, and a sandbox bank. This post lays out the trust model and its limits. The next three posts follow one session, the on-chain side, and what breaks first.
+> **TL;DR:** TIO scores a bank statement inside an AWS Nitro enclave, so no one, including me, reads it. It signs a risk tier, and a Solana program stores it. Anyone can check which code ran. The system is only as honest as four things you still trust: AWS Nitro and the enclave code, the Account Aggregator, one admin key, and a sandbox bank. This post lays out the trust model and its limits. The next two posts follow one session from the borrower to the Solana pool, and then look at what breaks first.
 
-**This is part 1 of 4 on how TEE Income Oracle works.**
+**This is part 1 of 3 on how TEE Income Oracle works.**
 
 1. **[A bank statement goes in, a risk tier comes out: the trust model of an income oracle on Solana](/posts/trust-model-of-an-income-oracle/)**
-2. [My own server carries every byte and still can't read or forge one: six hops through an enclave](/posts/six-hops-through-an-enclave/)
-3. [A PDA is the permission check: how a Solana pool refuses someone else's income tier](/posts/a-pda-is-the-permission-check/)
-4. [The crypto held, the restarts didn't: what breaks first in an enclave oracle](/posts/the-crypto-held-the-restarts-didnt/)
+2. [My own server carries every byte and still can't read or forge one: from borrower to Solana pool in six hops](/posts/six-hops-through-an-enclave/)
+3. [The crypto held, the restarts didn't: what breaks first in an enclave oracle](/posts/the-crypto-held-the-restarts-didnt/)
 
 A lender in India can read a borrower's bank statement with the borrower's consent, through the Account Aggregator (AA) system. The lender scores it and decides. The funder behind that lender sees none of this. They get a loan book and a promise that the income check ran honestly.
 
@@ -53,82 +52,71 @@ That sentence makes three separate claims, and each one rests on something diffe
 
 Here is who is trusted. Everything outside the enclave is treated as hostile, including my own gateway.
 
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 424 500" role="img" aria-labelledby="tio-d1-title tio-d1-desc" style="display:block;width:100%;max-width:440px;height:auto;margin:1.5rem auto" font-size="12" text-anchor="middle">
-<title id="tio-d1-title">TIO trust zones</title>
-<desc id="tio-d1-desc">The web app talks to the gateway. The gateway sends ciphertext and signed bytes through the Oyster host to the Nitro enclave, fetches from the sandbox bank, and submits the signed result to the oracle program. The oracle program writes the attestation to SAS. The demo pool reads SAS. The verifier checks the enclave attestation document against the oracle registry. Only the enclave is trusted.</desc>
-<defs>
-<marker id="tio-d1-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
-</defs>
-<g fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3" opacity="0.7">
-<rect x="8" y="8" width="280" height="192" rx="6"/>
-<rect x="296" y="8" width="120" height="96" rx="6"/>
-<rect x="8" y="336" width="408" height="112" rx="6"/>
-</g>
-<rect x="148" y="216" width="128" height="96" rx="6" fill="none" stroke="var(--accent)" stroke-width="2"/>
-<g fill="currentColor" font-size="10" letter-spacing="1" text-anchor="start">
-<text x="16" y="24">UNTRUSTED</text>
-<text x="304" y="24">EXTERNAL</text>
-<text x="156" y="232">TRUSTED</text>
-<text x="408" y="352" text-anchor="end">PUBLIC · SOLANA</text>
-</g>
-<g fill="var(--muted)" stroke="currentColor" stroke-width="1">
-<rect x="16" y="40" width="96" height="36" rx="4"/>
-<rect x="164" y="34" width="96" height="58" rx="4"/>
-<rect x="16" y="150" width="96" height="36" rx="4"/>
-<rect x="164" y="150" width="96" height="36" rx="4"/>
-<rect x="304" y="34" width="104" height="44" rx="4"/>
-<rect x="16" y="376" width="96" height="44" rx="4"/>
-<rect x="164" y="376" width="96" height="44" rx="4"/>
-<rect x="304" y="376" width="104" height="44" rx="4"/>
-</g>
-<rect x="164" y="244" width="96" height="60" rx="4" fill="var(--muted)" stroke="var(--accent)" stroke-width="2"/>
-<g fill="currentColor">
-<text x="64" y="62">Web app</text>
-<text x="212" y="54">Gateway</text>
-<text x="212" y="68">orchestrator</text>
-<text x="212" y="82">+ relayer</text>
-<text x="64" y="172">Verifier</text>
-<text x="212" y="172">Oyster host</text>
-<text x="356" y="52">Sandbox bank</text>
-<text x="356" y="66">mock FIP + AA</text>
-<text x="212" y="264">Nitro enclave</text>
-<text x="212" y="278">scoring core</text>
-<text x="212" y="292">(Rust)</text>
-<text x="64" y="395">Oracle</text>
-<text x="64" y="409">program</text>
-<text x="212" y="402">SAS</text>
-<text x="356" y="395">Demo</text>
-<text x="356" y="409">lending pool</text>
-</g>
-<g fill="none" stroke="currentColor" stroke-width="1.5" marker-end="url(#tio-d1-a)">
-<path d="M112,58 H164"/>
-<path d="M212,92 V150"/>
-<path d="M212,186 V244"/>
-<path d="M260,63 H304"/>
-<path d="M164,80 H138 V360 H96 V376"/>
-<path d="M64,186 V376"/>
-<path d="M112,398 H164"/>
-<path d="M304,398 H260"/>
-</g>
-<g fill="currentColor" font-size="11" text-anchor="start">
-<text x="220" y="112">ciphertext</text>
-<text x="220" y="125">+ signed</text>
-<text x="220" y="138">bytes</text>
-<text x="118" y="392">writes</text>
-<text x="266" y="392">reads</text>
-</g>
-<g fill="var(--background)" stroke="currentColor" stroke-width="1">
-<circle cx="138" cy="300" r="9"/>
-<circle cx="64" cy="262" r="9"/>
-</g>
-<g fill="currentColor" font-size="11" font-weight="bold">
-<text x="138" y="304">A</text>
-<text x="64" y="266">B</text>
-</g>
-<g fill="currentColor" font-size="12" text-anchor="start">
-<text x="16" y="472">A  gateway submits the signed result</text>
-<text x="16" y="490">B  verifier: attestation doc vs registry</text>
-</g>
+<svg class="tz" viewBox="0 0 440 420" role="img" aria-labelledby="tz-title tz-desc" xmlns="http://www.w3.org/2000/svg">
+  <title id="tz-title">Trust zones of TEE Income Oracle</title>
+  <desc id="tz-desc">Four zones. Untrusted: web app, gateway, Oyster host and verifier. Trusted: the Nitro enclave. External: the sandbox bank. Public on Solana: the oracle program with its enclave registry, the attestation service, and a demo lending pool. The web app talks to the gateway. The gateway sends encrypted and signed bytes through the host to the enclave, sends requests to the bank, and sends the signed result to the oracle program. The oracle writes the attestation to the attestation service, and the pool reads it. The verifier checks the enclave's attestation document against the oracle's registry.</desc>
+  <style>
+    svg.tz { display: block; width: 100%; height: auto; max-width: 440px; margin-inline: auto; font-family: inherit; }
+    svg.tz .zone { fill: var(--muted); fill-opacity: 0.35; stroke: var(--foreground); stroke-opacity: 0.45; stroke-width: 1; }
+    svg.tz .zone-trusted { fill: var(--accent); fill-opacity: 0.12; stroke: var(--accent); stroke-opacity: 1; stroke-width: 2.5; }
+    svg.tz .box { fill: var(--background); stroke: var(--foreground); stroke-width: 1.25; }
+    svg.tz .box-trusted { stroke: var(--accent); stroke-width: 2.5; }
+    svg.tz .zone-label { fill: var(--foreground); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; }
+    svg.tz .zone-label-trusted { fill: var(--accent); }
+    svg.tz .t { fill: var(--foreground); font-size: 14px; text-anchor: middle; }
+    svg.tz .t-sub { font-size: 12px; }
+    svg.tz .edge { fill: none; stroke: var(--foreground); stroke-width: 1.5; marker-end: url(#tz-arrow); }
+    svg.tz .edge-label { fill: var(--foreground); font-size: 12px; }
+    svg.tz .arrow-head { fill: var(--foreground); }
+  </style>
+  <defs>
+    <marker id="tz-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path class="arrow-head" d="M0 0 L10 5 L0 10 z" />
+    </marker>
+  </defs>
+  <rect class="zone" x="6" y="8" width="428" height="176" rx="8" />
+  <text class="zone-label" x="16" y="28">UNTRUSTED</text>
+  <rect class="zone" x="6" y="204" width="128" height="86" rx="8" />
+  <text class="zone-label" x="16" y="222">EXTERNAL</text>
+  <rect class="zone zone-trusted" x="150" y="204" width="140" height="86" rx="8" />
+  <text class="zone-label zone-label-trusted" x="160" y="222">TRUSTED</text>
+  <rect class="zone" x="6" y="312" width="428" height="100" rx="8" />
+  <text class="zone-label" x="16" y="330">PUBLIC: SOLANA</text>
+  <path class="edge" d="M120 66 H170" />
+  <path class="edge" d="M220 88 V124" />
+  <path class="edge" d="M180 88 V106 H105 V236" />
+  <path class="edge" d="M270 66 H405 V346" />
+  <path class="edge" d="M220 168 V236" />
+  <path class="edge" d="M360 168 V346" />
+  <path class="edge" d="M120 368 H170" />
+  <path class="edge" d="M320 368 H270" />
+  <text class="edge-label" x="111" y="122">requests</text>
+  <text class="edge-label" x="337" y="58" text-anchor="middle">result</text>
+  <text class="edge-label" x="226" y="198">encrypted</text>
+  <text class="edge-label" x="354" y="256" text-anchor="end">checks</text>
+  <text class="edge-label" x="145" y="361" text-anchor="middle">reads</text>
+  <text class="edge-label" x="295" y="361" text-anchor="middle">writes</text>
+  <rect class="box" x="20" y="44" width="100" height="44" rx="6" />
+  <text class="t" x="70" y="71">Web app</text>
+  <rect class="box" x="170" y="44" width="100" height="44" rx="6" />
+  <text class="t" x="220" y="71">Gateway</text>
+  <rect class="box" x="170" y="124" width="100" height="44" rx="6" />
+  <text class="t" x="220" y="151">Oyster host</text>
+  <rect class="box" x="320" y="124" width="80" height="44" rx="6" />
+  <text class="t" x="360" y="151">Verifier</text>
+  <rect class="box" x="20" y="236" width="100" height="44" rx="6" />
+  <text class="t" x="70" y="255">Sandbox</text>
+  <text class="t t-sub" x="70" y="271">bank + AA</text>
+  <rect class="box box-trusted" x="170" y="236" width="100" height="44" rx="6" />
+  <text class="t" x="220" y="255">Enclave</text>
+  <text class="t t-sub" x="220" y="271">Rust core</text>
+  <rect class="box" x="20" y="346" width="100" height="44" rx="6" />
+  <text class="t" x="70" y="373">Demo pool</text>
+  <rect class="box" x="170" y="346" width="100" height="44" rx="6" />
+  <text class="t" x="220" y="373">SAS</text>
+  <rect class="box" x="320" y="346" width="100" height="44" rx="6" />
+  <text class="t" x="370" y="365">Oracle</text>
+  <text class="t t-sub" x="370" y="381">+ registry</text>
 </svg>
 
 | Zone                | Pieces                                                                                                                            |
@@ -165,7 +153,7 @@ I'd rather you read this list than discover it.
 - **The admin step is off-chain.** The attested key is registered after a human checks it. On-chain verification of the enclave is future work.
 - **No bank signature reaches the lender in real AA.** This is the claim I had to walk back. In my sandbox, the bank signs the statement data, which is an extension I added. The AA specification does not give the lender a bank signature: each hop signs its own HTTP body, and the statement schema has no signature element (I checked this on 2026-10-05 against ReBIT's AA specification 2.1.0, FIP specification 2.2.0 and the `deposit_v2.0.0.xsd` schema). So for real data the provenance claim is only: _a licensed AA states that this bank returned this statement._ The AA joins the trust base. Whether a given AA forwards a bank signature outside the spec, I haven't confirmed.
 - **No sybil resistance.** One person with several wallets can get several tiers. This is documented and not claimed solved.
-- **Not a live AA connection.** The bank here is a sandbox I wrote, not a regulated institution of record. What going live would take is in [part 4](/posts/the-crypto-held-the-restarts-didnt/).
+- **Not a live AA connection.** The bank here is a sandbox I wrote, not a regulated institution of record. What going live would take is in [part 3](/posts/the-crypto-held-the-restarts-didnt/).
 - **No numbers yet.** I haven't measured session latency, the full cost of one attestation (rent plus fee) or the monthly cost of running the enclave, so this series doesn't quote any.
 - **Not underwriting.** The tier measures ability to pay from bank cash flow. It does not measure intent to pay or identity.
 
@@ -178,4 +166,4 @@ The architecture doc is in the repo, and the verifier lets you check an attestat
 - [`docs/VERIFY.md`](https://github.com/pandaa880/tee-income-oracle/blob/main/docs/VERIFY.md): how to run the verifier
 - The [verify page](https://tee-income-oracle-web.vercel.app/verify) runs the verifier in your browser. As of 23 November 2026 it is up, on a paid enclave that runs to about 8 December. After that the hosted pages may go offline. The repo, the docs and the verifier stay.
 
-**Next:** [part 2](/posts/six-hops-through-an-enclave/) follows one session through six hops and shows what my own gateway can and can't do at each one.
+**Next:** [part 2](/posts/six-hops-through-an-enclave/) follows one session from the borrower to the Solana pool in six hops, and shows what my own gateway can and can't do at each one.
