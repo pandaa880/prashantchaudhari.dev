@@ -247,7 +247,7 @@ The enclave signs with a secp256k1 key because Oyster gives each enclave one at 
 
 **Pro.** Solana verifies the signature in a built-in instruction, and the key type is platform-neutral, so changing the TEE never changes the on-chain check.
 
-**Cost.** Every transaction carries an extra instruction and the bytes that go with it.
+**Con.** Every transaction carries an extra instruction and the bytes that go with it.
 
 There is also a classic bug class here. The program never verifies the signature itself. The precompile does, one instruction earlier, and the program reads back what the precompile was given. The instruction-index fields in the precompile instruction must point at the precompile itself, or an attacker can make the check pass against other data. I test that case explicitly. If you copy this pattern, test it too. The five checks, and the attack each one stops, are in [Don't pass the signed bytes twice](/posts/dont-pass-the-signed-bytes-twice/).
 
