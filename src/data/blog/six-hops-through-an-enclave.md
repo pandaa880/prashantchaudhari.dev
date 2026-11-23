@@ -107,6 +107,8 @@ Notice who does what. The gateway (my server) is in the middle of nearly every s
 
 The gateway touches every message and can still do very little. This table shows what it sees at each hop and what it can't do:
 
+<div style="overflow-x:auto" tabindex="0" role="region" aria-label="What the gateway can and cannot do at each hop">
+
 | Hop            | The gateway/host sees                      | It can           | It cannot                                                                                                        |
 | -------------- | ------------------------------------------ | ---------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Session create | Public key material and the signed request | Read public keys | Change the key (the signature covers it) or swap the enclave's request key (the bank checks a binding signature) |
@@ -115,6 +117,8 @@ The gateway touches every message and can still do very little. This table shows
 | Evaluate       | Raw bytes in, signed payload out           | Replay old bytes | Get them accepted (one-time session nonce)                                                                       |
 | Submit         | The Solana transaction                     | Censor it        | Change the tier (the signature breaks)                                                                           |
 | Borrow         | Nothing relevant                           | Nothing          | Use another wallet's attestation, a stale one, or one from a build the pool hasn't approved                      |
+
+</div>
 
 Read the "cannot" column as a list of the reasons each hop holds:
 
