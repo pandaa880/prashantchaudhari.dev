@@ -41,6 +41,49 @@ The tier is stored as a Solana Attestation Service (SAS) attestation, a standard
 
 So the borrower can only reach their own tier. To use someone else's income, they would have to sign as that wallet. No comparison in my code can be forgotten, because there is nothing to compare: the wrong tier has no address the pool will ever derive.
 
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 424 540" role="img" aria-labelledby="tio-d3-title tio-d3-desc" style="display:block;width:100%;max-width:440px;height:auto;margin:1.5rem auto" font-size="12" text-anchor="middle">
+<title id="tio-d3-title">How the pool finds a borrower's tier</title>
+<desc id="tio-d3-desc">The borrow transaction is signed by wallet W. The pool derives the attestation address from the seeds attestation, credential, schema and a nonce equal to W, then reads the account at that address. It checks the credential, the schema, that the signer is the oracle PDA, freshness, that the enclave build is approved and active, and the policy hash. A tier written for a different wallet V sits at a different address, which the pool never derives from W, so there is nothing for W to point at.</desc>
+<defs>
+<marker id="tio-d3-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+</defs>
+<g fill="var(--muted)" stroke="currentColor" stroke-width="1">
+<rect x="16" y="10" width="392" height="40" rx="4"/>
+<rect x="16" y="76" width="392" height="62" rx="4"/>
+<rect x="16" y="164" width="392" height="38" rx="4"/>
+<rect x="16" y="228" width="392" height="158" rx="4"/>
+</g>
+<rect x="16" y="412" width="392" height="36" rx="4" fill="var(--muted)" stroke="var(--accent)" stroke-width="2"/>
+<rect x="16" y="470" width="392" height="62" rx="4" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3" opacity="0.7"/>
+<g fill="none" stroke="currentColor" stroke-width="1.5" marker-end="url(#tio-d3-a)">
+<path d="M212,50 V76"/>
+<path d="M212,138 V164"/>
+<path d="M212,202 V228"/>
+<path d="M212,386 V412"/>
+</g>
+<g fill="currentColor">
+<text x="212" y="35">Borrow, signed by wallet W</text>
+<text x="212" y="98" font-weight="bold">Pool derives the address from W</text>
+<text x="212" y="116">seeds: attestation, credential,</text>
+<text x="212" y="130">schema, nonce = W</text>
+<text x="212" y="188">Pool reads the account at that address</text>
+<text x="212" y="436">Tier accepted, borrow goes ahead</text>
+</g>
+<g fill="currentColor" text-anchor="start">
+<text x="32" y="250" font-weight="bold">Pool checks what it read</text>
+<text x="32" y="274">✓ credential is the pinned one</text>
+<text x="32" y="294">✓ schema is the pinned one</text>
+<text x="32" y="314">✓ signer is the oracle's PDA</text>
+<text x="32" y="334">✓ fresh enough</text>
+<text x="32" y="354">✓ enclave build approved, still active</text>
+<text x="32" y="374">✓ policy hash matches</text>
+<text x="44" y="490">Wallet V's tier sits at a different address</text>
+<text x="44" y="507">(nonce = V). The pool never derives that</text>
+<text x="44" y="524">from W, so W has nothing to point at.</text>
+</g>
+<text x="28" y="491" fill="currentColor" font-weight="bold" font-size="14" text-anchor="start">✕</text>
+</svg>
+
 The pool still checks what it reads. It pins the credential and schema through the address, and it requires the stored signer to be the oracle's own derived address, so a foreign credential can't pass. It also checks freshness, that the enclave build is approved and still active, and the policy hash. That is the G6 link from [part 1](/posts/trust-model-of-an-income-oracle/).
 
 ## The oracle's signer is a PDA too
