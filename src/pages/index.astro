@@ -24,6 +24,8 @@ const recentPosts = sortedPosts.filter(({ data }) => !data.featured);
 
 const structuredData = getHomeSchema(await getProfileImageURL());
 
+const emailHref = SOCIALS.find(({ name }) => name === "Mail")?.href;
+
 type Project = {
   name: string;
   oneLiner: string;
@@ -115,6 +117,12 @@ const PROJECTS: Project[] = [
           <p class="mt-3 text-foreground/90">
             Open to remote software engineering roles, full-time or contract.
             Based in Bangalore.
+            <a
+              href={emailHref}
+              class="text-accent decoration-dashed underline-offset-4 hover:underline"
+              >Email me</a
+            >
+            or
             <a
               href="https://x.com/pandaa880"
               target="_blank"
