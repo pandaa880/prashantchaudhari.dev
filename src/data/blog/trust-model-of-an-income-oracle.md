@@ -53,6 +53,84 @@ That sentence makes three separate claims, and each one rests on something diffe
 
 Here is who is trusted. Everything outside the enclave is treated as hostile, including my own gateway.
 
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 424 500" role="img" aria-labelledby="tio-d1-title tio-d1-desc" style="display:block;width:100%;max-width:440px;height:auto;margin:1.5rem auto" font-size="12" text-anchor="middle">
+<title id="tio-d1-title">TIO trust zones</title>
+<desc id="tio-d1-desc">The web app talks to the gateway. The gateway sends ciphertext and signed bytes through the Oyster host to the Nitro enclave, fetches from the sandbox bank, and submits the signed result to the oracle program. The oracle program writes the attestation to SAS. The demo pool reads SAS. The verifier checks the enclave attestation document against the oracle registry. Only the enclave is trusted.</desc>
+<defs>
+<marker id="tio-d1-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+</defs>
+<g fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3" opacity="0.7">
+<rect x="8" y="8" width="280" height="192" rx="6"/>
+<rect x="296" y="8" width="120" height="96" rx="6"/>
+<rect x="8" y="336" width="408" height="112" rx="6"/>
+</g>
+<rect x="148" y="216" width="128" height="96" rx="6" fill="none" stroke="var(--accent)" stroke-width="2"/>
+<g fill="currentColor" font-size="10" letter-spacing="1" text-anchor="start">
+<text x="16" y="24">UNTRUSTED</text>
+<text x="304" y="24">EXTERNAL</text>
+<text x="156" y="232">TRUSTED</text>
+<text x="408" y="352" text-anchor="end">PUBLIC · SOLANA</text>
+</g>
+<g fill="var(--muted)" stroke="currentColor" stroke-width="1">
+<rect x="16" y="40" width="96" height="36" rx="4"/>
+<rect x="164" y="34" width="96" height="58" rx="4"/>
+<rect x="16" y="150" width="96" height="36" rx="4"/>
+<rect x="164" y="150" width="96" height="36" rx="4"/>
+<rect x="304" y="34" width="104" height="44" rx="4"/>
+<rect x="16" y="376" width="96" height="44" rx="4"/>
+<rect x="164" y="376" width="96" height="44" rx="4"/>
+<rect x="304" y="376" width="104" height="44" rx="4"/>
+</g>
+<rect x="164" y="244" width="96" height="60" rx="4" fill="var(--muted)" stroke="var(--accent)" stroke-width="2"/>
+<g fill="currentColor">
+<text x="64" y="62">Web app</text>
+<text x="212" y="54">Gateway</text>
+<text x="212" y="68">orchestrator</text>
+<text x="212" y="82">+ relayer</text>
+<text x="64" y="172">Verifier</text>
+<text x="212" y="172">Oyster host</text>
+<text x="356" y="52">Sandbox bank</text>
+<text x="356" y="66">mock FIP + AA</text>
+<text x="212" y="264">Nitro enclave</text>
+<text x="212" y="278">scoring core</text>
+<text x="212" y="292">(Rust)</text>
+<text x="64" y="395">Oracle</text>
+<text x="64" y="409">program</text>
+<text x="212" y="402">SAS</text>
+<text x="356" y="395">Demo</text>
+<text x="356" y="409">lending pool</text>
+</g>
+<g fill="none" stroke="currentColor" stroke-width="1.5" marker-end="url(#tio-d1-a)">
+<path d="M112,58 H164"/>
+<path d="M212,92 V150"/>
+<path d="M212,186 V244"/>
+<path d="M260,63 H304"/>
+<path d="M164,80 H138 V360 H96 V376"/>
+<path d="M64,186 V376"/>
+<path d="M112,398 H164"/>
+<path d="M304,398 H260"/>
+</g>
+<g fill="currentColor" font-size="11" text-anchor="start">
+<text x="220" y="112">ciphertext</text>
+<text x="220" y="125">+ signed</text>
+<text x="220" y="138">bytes</text>
+<text x="118" y="392">writes</text>
+<text x="266" y="392">reads</text>
+</g>
+<g fill="var(--background)" stroke="currentColor" stroke-width="1">
+<circle cx="138" cy="300" r="9"/>
+<circle cx="64" cy="262" r="9"/>
+</g>
+<g fill="currentColor" font-size="11" font-weight="bold">
+<text x="138" y="304">A</text>
+<text x="64" y="266">B</text>
+</g>
+<g fill="currentColor" font-size="12" text-anchor="start">
+<text x="16" y="472">A  gateway submits the signed result</text>
+<text x="16" y="490">B  verifier: attestation doc vs registry</text>
+</g>
+</svg>
+
 | Zone                | Pieces                                                                                                                            |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | **Untrusted**       | The web app, the gateway (orchestrator and relayer), the Oyster host (a network proxy), and the verifier                          |
