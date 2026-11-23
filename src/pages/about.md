@@ -1,10 +1,10 @@
 ---
 layout: ../layouts/AboutLayout.astro
 title: "About"
-description: "Software engineer. Researching how money moves, building on Solana, and writing down the thinking from idea to working code."
+description: "Full-stack software engineer building payments and credit software on Solana."
 ---
 
-I'm Prashant, a software engineer with seven years of software work, about four of them on credit-card products. I'm researching how money moves and building on Solana. My latest project, [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle), is proof-of-reserves for loan books: a funder buying a pool of loans gets a bank-side check for each one, verifiable without seeing the borrower's statement.
+I'm Prashant, a full-stack software engineer with seven years of software work, about four of them on credit-card products. I build payments and credit software on Solana. My latest project, [TEE Income Oracle](https://github.com/pandaa880/tee-income-oracle), is proof-of-reserves for loan books: a funder buying a pool of loans gets a bank-side check for each one, verifiable without seeing the borrower's statement.
 
 **How I work:** I start from the problem, not the stack. I research and build side by side: read what's already out there, run small experiments to check my assumptions, then pick an approach and take it to something that works.
 
