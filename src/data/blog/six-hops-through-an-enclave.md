@@ -1,14 +1,14 @@
 ---
 title: "My own server carries every byte and still can't read or forge one: from borrower to Solana pool in six hops"
 description: "Follow one session from the borrower through my gateway, the enclave and the bank to the Solana lending pool. What my own server sees and can do at each of six hops, why the enclave's clock is not trusted, and how a PDA turns the last hop into a permission check."
-pubDatetime: 2026-11-29T17:00:00+05:30
+pubDatetime: 2026-11-24T18:00:00+05:30
 tags:
   - solana
   - aws-nitro
   - architecture
   - security
   - anchor
-draft: true
+draft: false
 ---
 
 > **TL;DR:** In TEE Income Oracle my gateway touches every message and still can't read the statement or change the tier, because each hop is signed, encrypted or bound to a one-time value. What a carrier can still do is stop the bytes, so availability isn't protected. The enclave doesn't trust its own clock either. On Solana the last hop works because the pool derives the attestation address from the wallet that signed the borrow, so a borrower can only ever reach their own tier. If you came for the Solana part, jump to [the PDA section](#the-borrow-hop-on-solana-a-pda-is-the-permission-check).
