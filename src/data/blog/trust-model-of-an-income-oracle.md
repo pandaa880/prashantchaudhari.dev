@@ -1,14 +1,14 @@
 ---
 title: "A bank statement goes in, a risk tier comes out: the trust model of an income oracle on Solana"
 description: "How TEE Income Oracle scores a bank statement in an enclave nobody can read and leaves a receipt anyone can check. The three claims it makes, the chain of six guarantees, and a plain list of who you still have to trust."
-pubDatetime: 2026-11-26T17:00:00+05:30
+pubDatetime: 2026-11-24T16:00:00+05:30
 tags:
   - solana
   - aws-nitro
   - architecture
   - attestation
   - security
-draft: true
+draft: false
 ---
 
 > **TL;DR:** TIO scores a bank statement inside an AWS Nitro enclave, so no one, including me, reads it. It signs a risk tier, and a Solana program stores it. Anyone can check which code ran. The system is only as honest as four things you still trust: AWS Nitro and the enclave code, the Account Aggregator, one admin key, and a sandbox bank. This post lays out the trust model and its limits. The next two posts follow one session from the borrower to the Solana pool, and then look at what breaks first.
