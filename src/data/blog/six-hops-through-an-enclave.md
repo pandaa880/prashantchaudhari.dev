@@ -28,6 +28,66 @@ If you want the other end of this, the browser page that refuses to show a tier 
 
 Here is the happy path, trimmed to the steps that matter. The full sequence is in the repo's architecture doc.
 
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 424 430" role="img" aria-labelledby="tio-d2-title tio-d2-desc" style="display:block;width:100%;max-width:440px;height:auto;margin:1.5rem auto" font-size="12" text-anchor="middle">
+<title id="tio-d2-title">One TIO session, step by step</title>
+<desc id="tio-d2-desc">Eleven numbered steps between the borrower, the gateway, the enclave, the bank and Solana. The borrower starts a session. The bank returns an AA-signed consent. The gateway creates a session in the enclave, which returns a signed data request. The borrower signs the intent with their wallet. The gateway carries the signed request to the bank, which returns an encrypted statement. The gateway sends the raw bytes to the enclave, which verifies, decrypts, scores and wipes, then returns the tier and signature. The gateway submits it to Solana. The borrower borrows against the attestation.</desc>
+<defs>
+<marker id="tio-d2-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+</defs>
+<g stroke="currentColor" stroke-width="1" stroke-dasharray="3 3" opacity="0.5">
+<path d="M40,36 V418"/>
+<path d="M130,36 V418"/>
+<path d="M220,36 V418"/>
+<path d="M310,36 V418"/>
+<path d="M388,36 V418"/>
+</g>
+<g fill="var(--muted)" stroke="currentColor" stroke-width="1">
+<rect x="4" y="6" width="72" height="28" rx="4"/>
+<rect x="94" y="6" width="72" height="28" rx="4"/>
+<rect x="184" y="6" width="72" height="28" rx="4" stroke="var(--accent)" stroke-width="2"/>
+<rect x="274" y="6" width="72" height="28" rx="4"/>
+<rect x="354" y="6" width="68" height="28" rx="4"/>
+</g>
+<g fill="currentColor">
+<text x="40" y="24">Borrower</text>
+<text x="130" y="24">Gateway</text>
+<text x="220" y="24">Enclave</text>
+<text x="310" y="24">Bank</text>
+<text x="388" y="24">Solana</text>
+</g>
+<rect x="228" y="284" width="112" height="36" rx="4" fill="var(--muted)" stroke="var(--accent)" stroke-width="2"/>
+<g fill="currentColor" font-size="11">
+<text x="284" y="299">verify, decrypt,</text>
+<text x="284" y="312">score, wipe</text>
+</g>
+<g fill="none" stroke="currentColor" stroke-width="1.5" marker-end="url(#tio-d2-a)">
+<path d="M40,64 H130"/>
+<path d="M310,94 H130"/>
+<path d="M130,124 H220"/>
+<path d="M220,154 H130"/>
+<path d="M40,184 H130"/>
+<path d="M130,214 H310"/>
+<path d="M310,244 H130"/>
+<path d="M130,274 H220"/>
+<path d="M220,340 H130"/>
+<path d="M130,370 H388"/>
+<path d="M40,400 H388"/>
+</g>
+<g fill="currentColor" font-size="11" stroke="var(--background)" stroke-width="3" paint-order="stroke">
+<text x="85" y="58">1 start</text>
+<text x="220" y="88">2 AA-signed consent</text>
+<text x="175" y="118">3 session</text>
+<text x="175" y="148">4 request</text>
+<text x="85" y="178">5 wallet sig</text>
+<text x="220" y="208">6 signed request</text>
+<text x="220" y="238">7 encrypted data</text>
+<text x="175" y="268">8 raw bytes</text>
+<text x="175" y="334">9 tier + sig</text>
+<text x="259" y="364">10 submit</text>
+<text x="214" y="394">11 borrow</text>
+</g>
+</svg>
+
 1. The borrower starts a session with the gateway, giving a wallet and a test borrower profile (a persona).
 2. The gateway asks the sandbox bank for consent, and gets back a consent signed by the AA.
 3. The gateway asks the enclave to create a session, passing the policy, the wallet and the consent.
