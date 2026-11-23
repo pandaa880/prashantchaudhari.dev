@@ -1,7 +1,7 @@
 ---
 title: "The crypto held, the restarts didn't: what breaks first in an enclave oracle"
 description: "The design choices behind TEE Income Oracle with what each bought and cost, then where it breaks first: a restart that needs a person, one instance with no failover, inputs the borrower controls, and thresholds with no feedback."
-pubDatetime: 2026-12-07T17:00:00+05:30
+pubDatetime: 2026-11-30T16:00:00+05:30
 tags:
   - solana
   - aws-nitro
@@ -85,6 +85,6 @@ When your system's operator is the adversary, list the trust assumptions as a ta
 - Repo: [tee-income-oracle](https://github.com/pandaa880/tee-income-oracle)
 - [`docs/ARCHITECTURE.md`](https://github.com/pandaa880/tee-income-oracle/blob/main/docs/ARCHITECTURE.md): the full security argument, threat model and the limits above
 - [`docs/VERIFY.md`](https://github.com/pandaa880/tee-income-oracle/blob/main/docs/VERIFY.md): how to run the verifier
-- The [verify page](https://tee-income-oracle-web.vercel.app/verify) runs the verifier in your browser. As of 23 November 2026 it is up, on a paid enclave that runs to about 8 December. After that the hosted pages may go offline. The repo, the docs and the verifier stay.
+- The [verify page](https://tee-income-oracle-web.vercel.app/verify) runs the verifier in your browser. I last checked it on 23 November 2026, when it was up. The enclave behind it is paid to about 8 December, so it should stay up until then. After that the hosted pages may go offline. The repo, the docs and the verifier stay.
 
 **Previous:** [part 2](/posts/six-hops-through-an-enclave/), from borrower to Solana pool in six hops.
