@@ -147,8 +147,6 @@ G5 is the honest gap. Someone with the admin key could register a fake enclave. 
 
 ## What this does not give you
 
-I'd rather you read this list than discover it.
-
 - **It is not trustless.** You trust AWS Nitro and the published enclave code, and in this deployment Marlin's base image.
 - **The admin step is off-chain.** The attested key is registered after a human checks it. On-chain verification of the enclave is future work.
 - **No bank signature reaches the lender in real AA.** This is the claim I had to walk back. In my sandbox, the bank signs the statement data, which is an extension I added. The AA specification does not give the lender a bank signature: each hop signs its own HTTP body, and the statement schema has no signature element (I checked this on 2026-10-05 against ReBIT's AA specification 2.1.0, FIP specification 2.2.0 and the `deposit_v2.0.0.xsd` schema). So for real data the provenance claim is only: _a licensed AA states that this bank returned this statement._ The AA joins the trust base. Whether a given AA forwards a bank signature outside the spec, I haven't confirmed.
